@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pywebview
+numpy
+soundcard
+pillow
+winsdk
+pystray

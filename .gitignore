@@ -1,0 +1,26 @@
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Cache directories
+__pycache__/
+.webview_cache/
+.pytest_cache/
+*.pyc
+
+# Build and distribution directories
+build/
+dist/
+*.spec
+
+# IDEs
+.idea/
+.vscode/
+
+# Ignore large archives
+*.zip

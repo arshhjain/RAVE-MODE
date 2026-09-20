@@ -1,0 +1,2278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+<title>RAVE MODE - PREMIUM UI</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-base: #030305;
+  --glass-bg: rgba(10, 10, 15, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --text-dim: #f7f7f7;
+  --text-mid: #a3a3c2;
+  --text-bright: #ffffff;
+  --accent: #8ba5b8;
+  --accent-glow: rgba(139, 165, 184, 0.4);
+}
+
+html, body {
+  width: 100vw; height: 100vh;
+  overflow: hidden;
+  background: var(--bg-base);
+  color: var(--text-bright);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  user-select: none; -webkit-user-select: none;
+}
+
+#art-bg {
+  position: fixed; inset: -50px;
+  background-size: cover; background-position: center;
+  z-index: 0; pointer-events: none;
+  transition: background-image 1.2s ease-in-out;
+  filter: brightness(3.0) saturate(1.8);
+}
+
+#app {
+  position: relative; z-index: 1;
+  width: 100vw; height: 100vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  background: transparent;
+  backdrop-filter: blur(0px);
+  border: 1px solid transparent;
+  transition: background 0.6s ease, backdrop-filter 0.6s ease, border 0.6s ease;
+}
+#app:has(button:hover),
+#app:has(.power-switch:hover),
+#app:has(#vibe-section:hover) {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.03);
+}
+
+
+#titlebar {
+  height: 64px; min-height: 64px;
+  display: flex; align-items: center;
+  padding: 0 12px; gap: 8px;
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+}
+#titlebar button { -webkit-app-region: no-drag; }
+
+#hb-btn {
+  width: 40px; height: 40px;
+  background: none; border: none; cursor: pointer;
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  gap: 5px;
+  padding: 8px; flex-shrink: 0;
+  opacity: 0.35; transition: all 0.3s ease;
+  -webkit-app-region: no-drag;
+}
+#hb-btn:hover, #hb-btn.open { opacity: 0.85; }
+#hb-btn span {
+  display: block; height: 2px; border-radius: 2px;
+  background: var(--text-bright);
+  box-shadow: 0 0 5px rgba(255,255,255,0.5);
+  transition: all .22s ease;
+  width: 22px; pointer-events: none;
+}
+#hb-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); background: var(--accent); }
+#hb-btn.open span:nth-child(2) { opacity: 0; }
+#hb-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); background: var(--accent); }
+
+#main-content {
+  flex: 1; display: flex; flex-direction: column; justify-content: center;
+  transition: all 0.6s ease;
+  transform: translateY(-28px);
+}
+#player-section {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; margin-top: 10px; margin-bottom: 48px;
+  transition: all 0.6s ease; transform-origin: top center;
+}
+#title-wrap {
+  width: 100%;
+  max-width: 320px;
+  padding: 0 20px;
+  text-align: center;
+  overflow: hidden; white-space: nowrap;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+}
+#track-scroller {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  will-change: transform;
+}
+#title-text {
+  font-size: 15px; font-weight: 800; color: var(--text-bright);
+  letter-spacing: 0.05em; margin-bottom: 2px;
+}
+#artist-text {
+  font-size: 11px; font-weight: 600; color: var(--text-dim);
+  letter-spacing: 0.05em; text-transform: uppercase;
+}
+.power-switch {
+  position: relative; display: inline-block; width: 40px; height: 22px;
+  -webkit-app-region: no-drag;
+  opacity: 0.35; transition: opacity 0.3s ease;
+}
+.power-switch::after {
+  content: ''; position: absolute;
+  top: -16px; bottom: -16px; left: -16px; right: -16px;
+  cursor: pointer;
+}
+.power-switch:hover { opacity: 0.85; }
+.power-switch input { opacity: 0; width: 0; height: 0; }
+.power-slider {
+  position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #333; transition: .4s; border-radius: 34px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.power-slider:before {
+  position: absolute; content: ""; height: 16px; width: 16px;
+  left: 2px; bottom: 2px; background-color: #555; transition: .4s; border-radius: 50%;
+}
+input:checked + .power-slider { background-color: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); box-shadow: none; }
+input:checked + .power-slider:before { transform: translateX(18px); background-color: #fff; }
+
+#vibe-section {
+  padding: 0 30px; margin-top: 15px; margin-bottom: 20px;
+  display: flex; flex-direction: column; align-items: center;
+  transition: all 0.6s ease; transform-origin: top center;
+}
+.vibe-slider-wrap {
+  width: 100%; max-width: 300px;
+  -webkit-app-region: no-drag;
+}
+#vibe-slider {
+  -webkit-appearance: none; width: 100%; height: 4px;
+  -webkit-app-region: no-drag;
+  background: rgba(255,255,255,0.1); border-radius: 2px; outline: none; margin-bottom: 12px;
+}
+#vibe-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--accent); cursor: pointer;
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+.vibe-ticks {
+  display: flex; justify-content: space-between;
+  width: 100%; padding: 0 5px;
+}
+.vibe-ticks span {
+  font-size: 9px; font-weight: 700; color: var(--text-mid);
+  letter-spacing: 0.1em; text-transform: uppercase;
+}
+
+#album-cover-wrap {
+  position: relative;
+  width: clamp(160px, 45vmin, 320px);
+  height: clamp(160px, 45vmin, 320px);
+  perspective: 1000px;
+  z-index: 10;
+  transition: all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.art-cover {
+  position: absolute !important; top: 0; left: 0;
+  width: 100% !important; height: 100% !important; border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.1);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+  transform-style: preserve-3d;
+}
+.art-old {
+  transform: rotateY(-90deg) scale(0.8);
+  opacity: 0;
+  pointer-events: none;
+}
+.art-new-start {
+  transform: rotateY(90deg) scale(0.8);
+  opacity: 0;
+}
+
+#main-content {
+  flex: 1; display: flex; flex-direction: column; justify-content: center;
+  transition: all 0.6s ease;
+  transform: translateY(-28px);
+}
+#player-section {
+  transition: all 0.6s ease;
+}
+
+/* Inactive State Styling */
+#app.inactive #title-text { 
+  font-size: 18px; 
+}
+#app.inactive #album-cover-wrap {
+  width: clamp(240px, 70vmin, 460px);
+  height: clamp(240px, 70vmin, 460px);
+}
+#app.inactive .art-cover {
+  box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+}
+#app.inactive #player-section { margin-bottom: 20px; }
+#app.inactive #vibe-section {
+  opacity: 0.35;
+  transform: scale(0.85) translateY(-10px);
+  pointer-events: none;
+}
+#app.inactive .knob-grid {
+  opacity: 0.4;
+  transform: scale(0.85);
+}
+#app.inactive .knob-ring {
+  filter: drop-shadow(0 0 0 transparent);
+}
+#app.inactive .knob-ring svg path.knob-arc {
+  stroke-width: 2 !important;
+  stroke: rgba(255, 255, 255, 0.4) !important;
+  filter: none !important;
+}
+#app.inactive .knob-value {
+  color: var(--text-dim);
+  text-shadow: none;
+  opacity: 0.8;
+}
+#app.inactive #main-content {
+  transform: translateY(20px);
+}
+#hb-btn.open span:nth-child(1) { transform: translateY(8px) rotate(45deg); background: var(--accent); }
+#hb-btn.open span:nth-child(2) { opacity: 0; }
+#hb-btn.open span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); background: var(--accent); }
+
+#track-info {
+  padding: 26px 24px 25px;
+  flex-shrink: 0;
+  z-index: 10;
+  -webkit-app-region: no-drag;
+}
+
+/* Marquee container — clips the scrolling text */
+#title-wrap {
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  pointer-events: none;
+  /* Fade edges so text doesn't hard-clip */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 6%,
+    black 94%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 6%,
+    black 94%,
+    transparent 100%
+  );
+}
+#title-text {
+  font-size: 16px; font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--text-bright);
+  display: inline-block;
+  /* transition handles the smooth scroll step */
+  will-change: transform;
+}
+
+.win-btn {
+  width: 32px; height: 32px;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-mid); font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; flex-shrink: 0;
+  transition: all .2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.win-btn:hover { background: rgba(255,255,255,0.15); color: var(--text-bright); transform: scale(1.1); opacity: 0.85; }
+#close-btn:hover { background: rgba(232, 17, 35, 0.8); color: #fff; box-shadow: 0 0 15px rgba(232, 17, 35, 0.5); }
+
+#api-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #333; flex-shrink: 0;
+  transition: background .4s, box-shadow .4s;
+  border: 1px solid rgba(0,0,0,0.5);
+  margin-left: auto; margin-right: 8px;
+}
+#api-dot.live {
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow), inset 0 0 4px #fff;
+  border-color: transparent;
+}
+
+.slabel {
+  font-size: 10px; font-weight: 800; letter-spacing: .25em;
+  color: var(--text-mid); text-transform: uppercase;
+  text-align: center; margin-top: 0px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  flex-shrink: 0;
+}
+
+#knob-section {
+  padding: 10px 24px; flex-shrink: 0;
+  font-size: 10px; font-weight: 800; letter-spacing: .25em;
+  text-transform: uppercase; text-align: center; margin-bottom: 5px;
+  -webkit-app-region: no-drag;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+}
+.knob-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px 12px; transition: all 0.6s ease; transform-origin: top center; }
+.knob-wrap {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 6px;
+  cursor: ns-resize; position: relative;
+  transition: transform 0.1s;
+}
+.knob-wrap:active { transform: scale(0.97); }
+.knob-label {
+  font-size: 9px; font-weight: 700; letter-spacing: .15em;
+  color: var(--text-dim); text-transform: uppercase;
+}
+.knob-ring {
+  width: 64px; height: 64px;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.02) 0%, transparent 60%);
+  border-radius: 50%;
+}
+.knob-ring svg { width: 64px; height: 64px; overflow: visible; }
+.knob-value {
+  font-size: 12px; font-weight: 700;
+  color: var(--accent);
+  font-family: 'Consolas', 'Courier New', monospace;
+  text-shadow: 0 0 8px var(--accent-glow);
+}
+#global-tip {
+  position: fixed;
+  z-index: 9999999;
+  pointer-events: none;
+  background: rgba(8, 8, 14, 0.97);
+  color: var(--text-bright);
+  backdrop-filter: blur(20px);
+  font-size: 10px;
+  letter-spacing: 0.01em;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.88), 0 0 14px var(--accent-glow);
+  width: max-content;
+  max-width: 215px;
+  text-align: left;
+  line-height: 1.35;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, -4px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+}
+#global-tip.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+.tip-desc {
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 5px;
+  font-size: 10.5px;
+  line-height: 1.3;
+}
+.tip-line {
+  font-size: 9.5px;
+  color: var(--text-mid);
+  margin-top: 3px;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  line-height: 1.25;
+}
+.tip-tag {
+  font-family: 'Consolas', monospace;
+  font-weight: 700;
+  font-size: 9px;
+  flex-shrink: 0;
+}
+.tip-tag.hi {
+  color: var(--accent);
+}
+.tip-tag.lo {
+  color: #ffaa00;
+}
+
+#palette-section {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+  align-items: stretch;
+  padding: 10px 24px 24px;
+  -webkit-app-region: no-drag;
+}
+#fluid-wrap {
+  position: fixed; inset: 0;
+  z-index: 0; overflow: hidden;
+  background: var(--bg-base);
+  pointer-events: none;
+}
+#fluid-bg {
+  width: 100%; height: 100%;
+  filter: blur(60px) saturate(2.4);
+  transform: scale(1.3);
+}
+
+#settings {
+  position: fixed; top: 64px; left: 0; right: 0; bottom: 0;
+  height: calc(100% - 64px);
+  z-index: 80;
+  background: rgba(5, 5, 8, 0.92);
+  backdrop-filter: blur(25px);
+  border-top: 1px solid var(--glass-border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  transform: translateY(100%);
+  transition: transform .4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+#settings.open { transform: translateY(0); box-shadow: 0 -10px 40px rgba(0,0,0,0.5); }
+
+#s-handle {
+  display: none;
+}
+#s-handle::after {
+  content: ''; width: 40px; height: 4px;
+  background: var(--text-dim); border-radius: 2px;
+}
+
+#s-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px 20px 80px;
+  display: flex; flex-direction: column; gap: 14px;
+  -webkit-app-region: no-drag;
+  overscroll-behavior: contain;
+}
+#s-body::-webkit-scrollbar,
+.acc-collapse::-webkit-scrollbar {
+  width: 6px;
+}
+#s-body::-webkit-scrollbar-track,
+.acc-collapse::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 3px;
+}
+#s-body::-webkit-scrollbar-thumb,
+.acc-collapse::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.3);
+  border-radius: 3px;
+  border: 1px solid rgba(0, 240, 255, 0.15);
+}
+#s-body::-webkit-scrollbar-thumb:hover,
+.acc-collapse::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.65);
+}
+
+.s-section-title {
+  font-size: 11px; font-weight: 800; letter-spacing: .25em;
+  color: var(--text-bright); text-transform: uppercase;
+  margin-bottom: 20px; border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 8px; text-shadow: 0 0 10px rgba(255,255,255,0.2);
+}
+
+.adv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: 16px 8px;
+  justify-items: center;
+  padding-bottom: 20px;
+}
+
+/* ── Collapsible Accordion System ─────────────────────── */
+.acc-item {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
+}
+.acc-item:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.acc-item.open {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(0, 240, 255, 0.35);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+.acc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  background: rgba(0, 0, 0, 0.25);
+  transition: background 0.2s;
+}
+.acc-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.calib-step {
+  flex: 1; height: 32px; border-radius: 6px; cursor: pointer;
+  border: 2px solid transparent; opacity: 0.3; transition: all 0.2s ease;
+}
+.calib-step.active {
+  opacity: 1; border-color: white; box-shadow: 0 0 10px rgba(255,255,255,0.5);
+}
+.calib-slider-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.calib-slider-row input { flex: 1; }
+.arc-dimmed {
+  opacity: 0.4;
+  pointer-events: none;
+  filter: grayscale(80%);
+  transition: all 0.3s ease;
+}
+.acc-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  color: var(--text-bright);
+  text-transform: uppercase;
+}
+.acc-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.acc-count {
+  font-size: 10px;
+  font-family: 'Consolas', monospace;
+  color: var(--text-mid);
+}
+.acc-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--text-mid);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s;
+}
+.acc-item.open .acc-chevron {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+.acc-collapse {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+  -webkit-app-region: no-drag;
+}
+.acc-item.open .acc-collapse {
+  max-height: 320px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  opacity: 1;
+  overscroll-behavior: contain;
+}
+.acc-body {
+  padding: 16px 14px 48px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.cfg-input {
+  background: rgba(0,0,0,0.5); color: var(--accent);
+  border: 1px solid var(--glass-border); border-radius: 6px;
+  padding: 8px 12px; font-size: 13px; width: 160px; text-align: right;
+  font-family: 'Consolas', 'Courier New', monospace;
+  transition: all 0.2s; box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+}
+.cfg-input:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.6), 0 0 8px var(--accent-glow);
+}
+
+.apply-btn {
+  background: linear-gradient(135deg, var(--text-bright) 0%, #d0d0d0 100%);
+  color: #000; border: none; border-radius: 6px; padding: 10px 30px;
+  font-size: 10px; font-weight: 800; cursor: pointer;
+  text-transform: uppercase; margin-top: 10px; transition: all 0.2s;
+  box-shadow: 0 4px 10px rgba(255,255,255,0.2);
+}
+.apply-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(255,255,255,0.3); }
+.apply-btn:active { transform: translateY(0); }
+
+/* ── Segment Editor Styles ────────────────────────────── */
+.seg-mode-group {
+  display: flex;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.seg-mode-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-mid);
+  padding: 8px 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.seg-mode-btn:hover {
+  color: var(--text-bright);
+}
+.seg-mode-btn.active {
+  background: var(--accent);
+  color: #000;
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.seg-minimap-wrap {
+  margin-bottom: 16px;
+}
+.seg-minimap-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .15em;
+  color: var(--text-mid);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.seg-minimap-bar {
+  width: 100%;
+  height: 14px;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+.seg-minimap-block {
+  height: 100%;
+  position: relative;
+  transition: width 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 800;
+  color: rgba(0,0,0,0.85);
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+.seg-minimap-block:not(:last-child) {
+  border-right: 1px solid rgba(0,0,0,0.4);
+}
+
+.seg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.seg-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.2s;
+}
+.seg-card:hover {
+  border-color: rgba(255,255,255,0.15);
+}
+.seg-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.seg-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+.seg-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.seg-badge {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-mid);
+  font-family: 'Consolas', monospace;
+}
+.seg-del-btn {
+  background: none;
+  border: none;
+  color: var(--text-mid);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+.seg-del-btn:hover {
+  color: #ff3366;
+  background: rgba(255,51,102,0.15);
+}
+.seg-inputs-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.seg-input-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+.seg-input-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.seg-num-input {
+  background: rgba(0,0,0,0.5);
+  color: var(--accent);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  width: 100%;
+  text-align: right;
+  font-family: 'Consolas', monospace;
+}
+.seg-num-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+
+.seg-actions-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  margin-bottom: 20px;
+}
+.seg-bottom-spacer {
+  height: 20px;
+  width: 100%;
+}
+.seg-add-btn {
+  flex: 1;
+  background: rgba(255,255,255,0.04);
+  border: 1px dashed var(--glass-border);
+  color: var(--text-bright);
+  padding: 8px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.seg-add-btn:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.seg-save-btn {
+  background: linear-gradient(135deg, var(--accent) 0%, #00b4d8 100%);
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 10px var(--accent-glow);
+}
+.seg-save-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px var(--accent-glow);
+}
+.seg-save-btn:active {
+  transform: translateY(0);
+}
+
+/* Marquee CSS */
+.marquee-container {
+  overflow: hidden;
+  white-space: nowrap;
+  position: relative;
+  width: 100%;
+}
+.marquee-content {
+  display: inline-block;
+  white-space: nowrap;
+}
+.marquee-anim {
+  animation: marquee-scroll linear infinite;
+}
+@keyframes marquee-scroll {
+  0% { transform: translateX(0); }
+  10% { transform: translateX(0); } /* Pause at start */
+  45% { transform: translateX(-50%); } /* Scroll to half */
+  55% { transform: translateX(-50%); } /* Pause at end */
+  90% { transform: translateX(0); } /* Scroll back */
+  100% { transform: translateX(0); }
+}
+
+/* Miniplayer Mode - Dynamic Hover Layout (330x250) */
+body.miniplayer #app {
+  padding: 15px !important;
+  display: flex;
+  flex-direction: column;
+}
+
+body.miniplayer #titlebar {
+  background: transparent !important;
+  border-bottom: none !important;
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 35px;
+  padding: 10px 10px;
+  z-index: 50;
+  display: flex;
+  justify-content: flex-end;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+body.miniplayer:hover #titlebar {
+  opacity: 1;
+}
+body.miniplayer #titlebar > div:first-child {
+  display: none; /* Hide 'RAVE MODE' text */
+}
+
+body.miniplayer #knob-section,
+body.miniplayer #vibe-section,
+body.miniplayer #accordion,
+body.miniplayer .win-btn:not(#miniplayer-btn),
+body.miniplayer .power-switch,
+body.miniplayer #hb-btn {
+  display: none !important;
+}
+
+body.miniplayer .win-btn {
+  color: rgba(255, 255, 255, 0.6);
+  margin-left: 10px;
+  font-size: 14px;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+}
+body.miniplayer .win-btn:hover {
+  color: #fff;
+}
+
+body.miniplayer #main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(0);
+}
+
+body.miniplayer #player-section {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  margin: 0;
+  gap: 0;
+  transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+body.miniplayer #album-cover-wrap {
+  position: relative;
+  height: 140px; /* < 3/7 of 330px (141.4px) */
+  width: 140px;
+  margin: 0;
+  flex-shrink: 0;
+  border-radius: 8px;
+  display: block;
+  transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+body.miniplayer #album-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+  transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+body.miniplayer #title-wrap {
+  position: relative;
+  height: auto;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: left;
+  pointer-events: auto;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+body.miniplayer:hover #album-cover-wrap {
+  height: 100px;
+  width: 100px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+}
+
+body.miniplayer:hover #title-wrap {
+  max-width: 180px;
+  opacity: 1;
+  padding-left: 15px;
+}
+
+body.miniplayer #title-container {
+  mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  width: 100%;
+}
+
+body.miniplayer #title-text {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 2px;
+  line-height: 1.2;
+}
+
+body.miniplayer #artist-text {
+  font-size: 13px;
+  color: #b3b3b3;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+/* Power Off State */
+body.power-off {
+  filter: grayscale(100%);
+  opacity: 0.7;
+}
+body.power-off #main-content {
+  transform: scale(0.85) translateY(-28px);
+}
+body.power-off #fluid-bg {
+  opacity: 0.2;
+}
+body.power-off .marquee-content {
+  animation-play-state: paused !important;
+}
+</style>
+</head>
+<body>
+<div id="global-tip"></div>
+
+<div id="fluid-wrap">
+  <canvas id="fluid-bg"></canvas>
+</div>
+
+<div id="app">
+  <div id="titlebar" class="pywebview-drag-region">
+    <button id="hb-btn" onclick="toggleAccordion('acc-dynamics')"><span></span><span></span><span></span></button>
+    <div style="flex:1;"></div>
+    <label class="power-switch">
+      <input type="checkbox" id="power-toggle" checked>
+      <span class="power-slider"></span>
+    </label>
+    <button class="win-btn" id="miniplayer-btn" style="font-size: 14px; padding-bottom: 2px;">&#10697;</button>
+    <button class="win-btn" id="min-btn">&#8722;</button>
+    <button class="win-btn" id="close-btn">&#215;</button>
+  </div>
+
+  <div id="main-content">
+  <div id="player-section">
+    <div id="album-cover-wrap">
+      <img id="album-cover" class="art-cover" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="Album Art" />
+    </div>
+    <div id="title-wrap">
+      <div class="marquee-container" id="title-container">
+        <div class="marquee-content" id="title-text">Awaiting Audio Stream...</div>
+      </div>
+      <div class="marquee-container" id="artist-container">
+        <div class="marquee-content" id="artist-text" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="knob-section">
+    <div class="knob-grid" id="main-knobs"></div>
+  </div>
+
+  <div id="vibe-section">
+    <div class="vibe-slider-wrap">
+      <input type="range" id="vibe-slider" min="0" max="3" step="1" value="2">
+      <div class="vibe-ticks">
+        <span>Cozy</span>
+        <span>Lounge</span>
+        <span>Accurate</span>
+        <span>Rave</span>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<div id="settings">
+  <div id="s-handle" class="pywebview-drag-region"></div>
+  <div id="s-body">
+    <!-- 1. Dynamics & Timing -->
+    <div class="acc-item open" id="acc-dynamics">
+      <div class="acc-header" onclick="toggleAccordion('acc-dynamics')">
+        <div class="acc-title-wrap">
+          <div class="acc-title">Dynamics & Envelopes</div>
+        </div>
+        <div class="acc-meta">
+          <span class="acc-count">3 knobs</span>
+          <svg class="acc-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+        </div>
+      </div>
+      <div class="acc-collapse">
+        <div class="acc-body">
+          <div class="arc-toggle-wrap" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px; padding: 0 5px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+            <div style="display:flex; flex-direction:column; gap:4px; max-width: 75%;">
+              <span style="color:var(--text-bright); font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:1px;">Auto Response (ARC)</span>
+              <span style="color:var(--text-dim); font-size:11px; line-height: 1.4;">Dynamically accelerates decay during fast, dense audio to prevent muddiness.</span>
+            </div>
+            <label class="power-switch" style="opacity:1; margin:0;">
+              <input type="checkbox" id="arc-toggle">
+              <span class="power-slider"></span>
+            </label>
+          </div>
+          <div class="adv-grid" id="knobs-dynamics"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Bass Engine -->
+    <div class="acc-item" id="acc-bass">
+      <div class="acc-header" onclick="toggleAccordion('acc-bass')">
+        <div class="acc-title-wrap">
+          <div class="acc-title">Bass Engine</div>
+        </div>
+        <div class="acc-meta">
+          <span class="acc-count">2 knobs</span>
+          <svg class="acc-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+        </div>
+      </div>
+      <div class="acc-collapse">
+        <div class="acc-body">
+          <div class="adv-grid" id="knobs-bass"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Treble Engine -->
+    <div class="acc-item" id="acc-treble">
+      <div class="acc-header" onclick="toggleAccordion('acc-treble')">
+        <div class="acc-title-wrap">
+          <div class="acc-title">Treble Engine</div>
+        </div>
+        <div class="acc-meta">
+          <span class="acc-count">4 knobs</span>
+          <svg class="acc-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+        </div>
+      </div>
+      <div class="acc-collapse">
+        <div class="acc-body">
+          <div class="adv-grid" id="knobs-treble"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Segment Layout & Modes -->
+    <div class="acc-item" id="acc-segments">
+      <div class="acc-header" onclick="toggleAccordion('acc-segments')">
+        <div class="acc-title-wrap">
+          <div class="acc-title">Segment Layout & Modes</div>
+        </div>
+        <div class="acc-meta">
+          <span class="acc-count" id="acc-seg-stat">Independent</span>
+          <svg class="acc-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+        </div>
+      </div>
+      <div class="acc-collapse">
+        <div class="acc-body">
+          <div class="seg-mode-group">
+            <button class="seg-mode-btn active" id="btn-mode-indep" onclick="setSegmentMode('independent')">Independent</button>
+            <button class="seg-mode-btn" id="btn-mode-overlay" onclick="setSegmentMode('overlay')">Overlay</button>
+            <button class="seg-mode-btn" id="btn-mode-cont" onclick="setSegmentMode('continuous')">Continuous</button>
+          </div>
+
+          <div class="seg-minimap-wrap">
+            <div class="seg-minimap-label">
+              <span>Strip Coverage</span>
+              <span id="seg-coverage-stat">0 / 0 LEDs</span>
+            </div>
+            <div class="seg-minimap-bar" id="seg-minimap"></div>
+          </div>
+
+          <div class="seg-list" id="seg-cards"></div>
+
+          <div class="seg-actions-row">
+            <button class="seg-add-btn" onclick="addSegment()">+ Add Segment</button>
+            <button class="seg-save-btn" id="seg-save-btn" onclick="saveSegments()">Apply Segments</button>
+          </div>
+          <div class="seg-bottom-spacer"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. WLED Connection -->
+    <div class="acc-item" id="acc-wled">
+      <div class="acc-header" onclick="toggleAccordion('acc-wled')">
+        <div class="acc-title-wrap">
+          <div class="acc-title">WLED Connection</div>
+        </div>
+        <div class="acc-meta">
+          <span class="acc-count" id="acc-wled-stat">197 LEDs</span>
+          <svg class="acc-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+        </div>
+      </div>
+      <div class="acc-collapse">
+        <div class="acc-body">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span class="knob-label">IP Address</span>
+              <input class="cfg-input" id="cfg-ip" type="text" placeholder="192.168.1.x"/>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span class="knob-label">LED Count</span>
+              <input class="cfg-input" id="cfg-leds" type="number" placeholder="144" oninput="if(typeof renderMinimap==='function')renderMinimap()"/>
+            </div>
+            <button class="apply-btn" onclick="applyCfg()">Save & Sync</button>
+            
+            <div style="width:100%; height:1px; background:rgba(255,255,255,0.1); margin:10px 0;"></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span class="knob-label">Hardware Calibration</span>
+              <button class="apply-btn" style="width:auto; padding:6px 12px; margin:0;" onclick="openCalibModal()">Open Wizard</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="calib-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; justify-content:center; align-items:center;">
+  <div style="background:var(--glass-bg); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:24px; width:90%; max-width:400px; display:flex; flex-direction:column; gap:20px;">
+    
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0; font-size:16px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:white;">Hardware Calibration</h2>
+      <button onclick="closeCalibModal()" style="background:none; border:none; color:white; font-size:24px; cursor:pointer; line-height:1;">&times;</button>
+    </div>
+
+    <div id="calib-swatch" style="width:100%; height:100px; border-radius:8px; background:#00FFFF; box-shadow:0 0 20px rgba(0,255,255,0.2); display:flex; align-items:center; justify-content:center; flex-direction:column; color:black;">
+      <div id="calib-swatch-title" style="font-size:18px; font-weight:800; letter-spacing:2px;">CYAN</div>
+    </div>
+
+    <div id="calib-instructions" style="color:var(--text-dim); font-size:12px; line-height:1.5; text-align:center;">
+      Adjust the slider below until the color on your LEDs perfectly matches the color above.
+    </div>
+
+    <div id="calib-slider-container" style="display:flex; flex-direction:column; gap:8px;">
+      <div style="display:flex; justify-content:space-between; font-size:10px; font-weight:800; letter-spacing:1px; text-transform:uppercase;">
+        <span id="calib-label-left" style="color:#44ff44;">More Green</span>
+        <span id="calib-label-right" style="color:#4444ff;">More Blue</span>
+      </div>
+      <input type="range" class="cfg-input" id="calib-balance" min="0" max="1" step="0.01" value="0.5" oninput="updateCalibMath()">
+    </div>
+
+    <div style="display:flex; justify-content:space-between; gap:10px; margin-top:10px;">
+      <button class="apply-btn" id="calib-prev" onclick="calibPrev()" style="background:rgba(255,255,255,0.1); flex:1;">Back</button>
+      <button class="apply-btn" id="calib-next" onclick="calibNext()" style="flex:1;">Next Step</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+window.onerror = function(msg, url, line, col, error) { alert(msg + ' at ' + line + ':' + col); };
+// ── Drag interceptors ──────────────────────────────────────────────────
+['knob-section', 'palette-section', 'settings', 'track-info'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('mousedown',  e => e.stopPropagation());
+  el.addEventListener('touchstart', e => e.stopPropagation());
+});
+
+// ── Spotify-style marquee ──────────────────────────────────────────────
+// Behaviour:
+//   1. Pause at start (1.4s)
+//   2. Scroll left at constant speed until end of text is visible
+//   3. Pause at end (1.4s)
+//   4. Jump instantly back to start, repeat
+//
+// Driven by a single rAF loop with a state machine — no CSS animation,
+// no fighting between transform and animation properties.
+
+// ── Spotify-style marquee ──────────────────────────────────────────────
+const MQ_SPEED    = 40;
+const MQ_PAUSE_MS = 1400;
+
+function applyMarquee(containerId, textId, text) {
+  const container = document.getElementById(containerId);
+  const el = document.getElementById(textId);
+  if (!container || !el) return;
+
+  if (!text) {
+      el.style.display = 'none';
+      return;
+  }
+  
+  el.style.display = 'inline-block';
+  el.textContent = text;
+  el.classList.remove('marquee-anim');
+  container.style.maskImage = 'none';
+  container.style.webkitMaskImage = 'none';
+  
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const cWidth = container.clientWidth;
+    if (cWidth === 0) {
+      setTimeout(() => applyMarquee(containerId, textId, text), 50);
+      return;
+    }
+
+    if (el.scrollWidth > cWidth + 2) {
+      el.innerHTML = text + '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + text;
+      el.classList.add('marquee-anim');
+      container.style.maskImage = 'linear-gradient(to right, transparent 0%, black 4%, black 96%, transparent 100%)';
+      container.style.webkitMaskImage = 'linear-gradient(to right, transparent 0%, black 4%, black 96%, transparent 100%)';
+      
+      const duration = Math.max(8, el.scrollWidth / 30);
+      el.style.animationDuration = `${duration}s`;
+    }
+  }));
+}
+
+
+// ── WebSocket ──────────────────────────────────────────────────────────
+let ws         = null;
+let cache      = { knobs: {} };
+let lastTrack  = null;
+let cfgSeeded  = false;
+let activeDrags = 0;
+
+function wsSend(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+}
+
+function connectWS() {
+  const host = window.location.hostname;
+  const url  = `ws://${host}:7373/ws`;
+  try { ws = new WebSocket(url); }
+  catch(e) { setTimeout(connectWS, 600); return; }
+  ws.onopen    = () => {}
+  ws.onmessage = e => onFrame(JSON.parse(e.data));
+  ws.onerror   = () => {};
+  ws.onclose   = () => {
+    {}
+    setTimeout(connectWS, 600);
+  };
+}
+connectWS();
+
+document.getElementById('min-btn').onclick   = () => wsSend({type:'window', action:'minimize'});
+document.getElementById('close-btn').onclick = () => wsSend({type:'window', action:'close'});
+document.getElementById('miniplayer-btn').onclick = () => {
+  const isMini = document.body.classList.toggle('miniplayer');
+  wsSend({type:'window', action:'set_miniplayer', value: isMini});
+};
+document.getElementById('hb-btn').onclick    = toggleSettings;
+
+// ── Log scale helpers ──────────────────────────────────────────────────
+const logToActual = (n,mn,mx) => { mn=Math.max(mn,1e-9); return mn*Math.pow(mx/mn,n); };
+const actualToNorm= (a,mn,mx) => { mn=Math.max(mn,1e-9); a=Math.max(a,mn); return Math.log(a/mn)/Math.log(mx/mn); };
+const normDisp    = n => Math.max(1,Math.min(100,Math.round(n*99)+1));
+
+// ── Knob definitions ───────────────────────────────────────────────────
+const MAIN_K = [
+  {
+    key: 'sensitivity', label: 'Sensitivity', mn: 0.05, mx: 1.1567, log: 0,
+    tip: {
+      desc: 'Overall audio reactivity.',
+      high: 'Flashes to quiet sounds & whispers',
+      low: 'Only hits on loud prominent beats'
+    },
+    fmt: (v,mn,mx)=>Math.round(1 + ((v-mn)/(mx-mn))*9).toString()
+  },
+  {
+    key: 'brightness', label: 'Ambient', mn: 0.005, mx: 0.2069, log: 1,
+    tip: {
+      desc: 'Resting background ambient glow.',
+      high: 'Bright room-filling ambient floor',
+      low: 'Near-black darkness between beats'
+    },
+    fmt: (v,mn,mx)=>Math.round(1 + ((v-mn)/(mx-mn))*9).toString()
+  },
+  {
+    key: 'responsiveness', label: 'Responsiveness', mn: 0.0, mx: 0.0889, log: 0,
+    tip: {
+      desc: 'Reaction speed of the lights.',
+      high: 'Fast, snappy, instant flickers',
+      low: 'Smooth, floating, relaxed fades'
+    },
+    fmt: (v,mn,mx)=>Math.round(1 + ((v-mn)/(mx-mn))*9).toString()
+  }
+];
+const DYN_K = [
+  {
+    key: 'responsiveness', label: 'Response', mn: 0.0, mx: 0.0889, log: 0,
+    tip: {
+      desc: 'Envelope attack & fade speed.',
+      high: 'Snappy, energetic party tempo',
+      low: 'Calm, slow-breathing lounge tempo'
+    }
+  },
+  {
+    key: 'attack_gamma', label: 'Attack Curve', mn: 0.5, mx: 2.4556, log: 0,
+    tip: {
+      desc: 'How beats bloom from darkness.',
+      high: 'Soft analog swell (gentle on eyes)',
+      low: 'Instant, punchy strobe hits'
+    }
+  },
+  {
+    key: 'decay_gamma', label: 'Decay Curve', mn: 0.1, mx: 1.6556, log: 0,
+    tip: {
+      desc: 'How beats fade back to black.',
+      high: 'Quick fade that cleanly settles',
+      low: 'Long, lingering sustained light'
+    }
+  },
+];
+const BASS_K = [
+  {
+    key: 'bass_intensity', label: 'Bass Drive', mn: 0.01, mx: 7.6973, log: 1,
+    tip: {
+      desc: 'Kick drum & 808 blast power.',
+      high: 'Huge, room-shaking bass flashes',
+      low: 'Subtle, restrained bass thump'
+    }
+  },
+  {
+    key: 'bass_width', label: 'Bass Width', mn: 2, mx: 0, log: 0, dyn: () => (cache.knobs.led_count || 108) * 1.25,
+    tip: {
+      desc: 'Physical spread of bass pulses.',
+      high: 'Expands across the entire strip',
+      low: 'Tight, punchy center blast'
+    }
+  },
+];
+const TREBLE_K = [
+  {
+    key: 'treble_intensity', label: 'Treble Drive', mn: 0.05, mx: 48.0014, log: 1,
+    tip: {
+      desc: 'Brightness of hi-hats & vocals.',
+      high: 'Crisp, piercing sparkles on highs',
+      low: 'Mellow, gentle high notes'
+    }
+  },
+  {
+    key: 'treble_sens', label: 'Treble Sens', mn: 0.1, mx: 4.1733, log: 0,
+    tip: {
+      desc: 'Treble volume relative to bass.',
+      high: 'Highs punch through heavy bass',
+      low: 'Bass dominates the lighting'
+    }
+  },
+  {
+    key: 'treble_width', label: 'Treble Width', mn: 2, mx: 0, log: 0, dyn: () => (cache.knobs.led_count || 108) * .5,
+    tip: {
+      desc: 'Physical size of treble flashes.',
+      high: 'Wide, sweeping light bursts',
+      low: 'Sharp, pinpoint sparks'
+    }
+  },
+  {
+    key: 'treble_zone', label: 'Treble Zone', mn: 0, mx: 0, log: 0, dyn: () => (cache.knobs.led_count || 108) * .4, isInt: 1,
+    tip: {
+      desc: 'Where treble sparks ignite.',
+      high: 'Sparks move inward toward center',
+      low: 'Sparks stay at outer strip edges'
+    }
+  },
+];
+
+// ── Knob arc SVG ───────────────────────────────────────────────────────
+const S=220, SPAN=260, CX=32, CY=32, R=24;
+const ARC_LEN = 2 * Math.PI * R * (SPAN / 360);
+function pt(deg){ const r=(deg-90)*Math.PI/180; return [CX+R*Math.cos(r), CY+R*Math.sin(r)]; }
+function getTrackPath(){
+  const [x1,y1]=pt(S), [x2,y2]=pt(S+SPAN);
+  return `M${x1} ${y1} A${R} ${R} 0 1 1 ${x2} ${y2}`;
+}
+
+// ── Build knob ─────────────────────────────────────────────────────────
+function buildKnob(d, container){
+  const w=document.createElement('div'); w.className='knob-wrap';
+  w.innerHTML=`
+    <div class="knob-label">${d.label}</div>
+    <div class="knob-ring"><svg viewBox="0 0 64 64">
+      <path d="${getTrackPath()}"
+            fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="5" stroke-linecap="round"/>
+      <path class="fg" d="${getTrackPath()}" fill="none" stroke="var(--accent)" stroke-width="5" stroke-linecap="round" stroke-dasharray="${ARC_LEN}" stroke-dashoffset="${ARC_LEN}" style="transition: stroke-dashoffset 0.05s linear;"/>
+    </svg></div>
+    <div class="knob-value">—</div>`;
+  container.appendChild(w);
+
+  w.addEventListener('mouseenter', () => {
+    if (dragging || activeDrags > 0) return;
+    showGlobalTip(w, d.tip);
+  });
+  w.addEventListener('mouseleave', hideGlobalTip);
+
+  const fg=w.querySelector('.fg'), vl=w.querySelector('.knob-value');
+  const getMax=()=>d.dyn?d.dyn():d.mx;
+  let dragging=false, dn=0;
+  let lastUserTouch=0;
+  let lastSendTime=0;
+
+  function refresh(knobs){
+    if (dragging) return;
+    // Suppress echo frames from server while or immediately after user adjusted knob
+    if (performance.now() - lastUserTouch < 500) return;
+    const a=knobs[d.key]; if(a==null)return;
+    const mx=getMax();
+    const n=d.log?actualToNorm(a,d.mn,mx):(a-d.mn)/(mx-d.mn||1);
+    fg.style.strokeDashoffset = Math.max(0, ARC_LEN * (1 - n));
+    vl.textContent = Math.round(1 + n * 9).toString();
+  }
+
+  w.onpointerdown=e=>{
+    hideGlobalTip();
+    e.stopPropagation(); e.preventDefault();
+    dragging=true; activeDrags++;
+    lastUserTouch=performance.now();
+    w.setPointerCapture(e.pointerId);
+    const a=cache.knobs[d.key]??d.mn, mx=getMax();
+    dn=d.log?actualToNorm(a,d.mn,mx):(a-d.mn)/(mx-d.mn||1);
+  };
+
+  w.onpointermove=e=>{
+    if(!dragging)return;
+    lastUserTouch=performance.now();
+    dn=Math.max(0,Math.min(1, dn-e.movementY/150));
+    const mx=getMax();
+    let val=d.log?logToActual(dn,d.mn,mx):d.mn+dn*(mx-d.mn);
+    if(d.isInt) val=Math.round(val);
+    fg.style.strokeDashoffset = Math.max(0, ARC_LEN * (1 - dn));
+    vl.textContent = Math.round(1 + dn * 9).toString();
+    if(cache.knobs) cache.knobs[d.key]=val;
+
+    const now=performance.now();
+    if(now - lastSendTime > 28){
+      wsSend({type:'knob', key:d.key, value:val});
+      lastSendTime=now;
+    }
+  };
+
+  const endDrag=()=>{
+    if(!dragging) return;
+    dragging=false; activeDrags=Math.max(0,activeDrags-1);
+    hideGlobalTip();
+    lastUserTouch=performance.now();
+    const mx=getMax();
+    let val=d.log?logToActual(dn,d.mn,mx):d.mn+dn*(mx-d.mn);
+    if(d.isInt) val=Math.round(val);
+    wsSend({type:'knob', key:d.key, value:val});
+  };
+
+  w.onpointerup    = endDrag;
+  w.onpointercancel= endDrag;
+
+  w.addEventListener('wheel', e => {
+    e.preventDefault();
+    hideGlobalTip();
+    lastUserTouch = performance.now();
+    
+    const a = cache.knobs[d.key] ?? d.mn;
+    const mx = getMax();
+    let currentDn = d.log ? actualToNorm(a, d.mn, mx) : (a - d.mn) / (mx - d.mn || 1);
+    
+    currentDn = Math.max(0, Math.min(1, currentDn - e.deltaY / 1500));
+    
+    let val = d.log ? logToActual(currentDn, d.mn, mx) : d.mn + currentDn * (mx - d.mn);
+    if(d.isInt) val = Math.round(val);
+    
+    fg.style.strokeDashoffset = Math.max(0, ARC_LEN * (1 - currentDn));
+    vl.textContent = Math.round(1 + currentDn * 9).toString();
+    
+    if(cache.knobs) cache.knobs[d.key] = val;
+    
+    const now = performance.now();
+    if(now - lastSendTime > 28) {
+      wsSend({type:'knob', key:d.key, value:val});
+      lastSendTime = now;
+    }
+    
+    clearTimeout(w._wheelTimer);
+    w._wheelTimer = setTimeout(() => {
+      wsSend({type:'knob', key:d.key, value:val});
+    }, 50);
+  }, { passive: false });
+
+  return {refresh};
+}
+
+const mainW   = MAIN_K.map(k => buildKnob(k, document.getElementById('main-knobs')));
+
+// ── Vibe Slider & Power Toggle ──────────────────────────────────────
+const vibeVals = [0.08, 0.19, 0.68, 1.0];
+document.getElementById('vibe-slider').addEventListener('input', e => {
+  const rounded = Math.round(parseFloat(e.target.value));
+  const v = vibeVals[rounded];
+  wsSend({type:'knob', key:'saturation', value:v});
+});
+document.getElementById('power-toggle').addEventListener('change', e => {
+  wsSend({type:'knob', key:'power', value:e.target.checked});
+});
+document.getElementById('arc-toggle').addEventListener('change', e => {
+  wsSend({type:'knob', key:'arc_enabled', value:e.target.checked});
+});
+
+// ── Inactive Auto-Dimming ──────────────────────────────────────────
+let inactiveTimer = null;
+const appEl = document.getElementById('app');
+let lastMouseX = -1, lastMouseY = -1;
+function resetInactiveTimer(e) {
+  if (e && e.type === 'mousemove') {
+    if (e.clientX === lastMouseX && e.clientY === lastMouseY) return;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  }
+  appEl.classList.remove('inactive');
+  clearTimeout(inactiveTimer);
+  
+  const waitTime = (typeof activeDrags !== 'undefined' && activeDrags > 0) ? 500 : 2500;
+  
+  inactiveTimer = setTimeout(() => {
+    if (typeof activeDrags !== 'undefined' && activeDrags > 0) {
+      resetInactiveTimer();
+    } else if (!document.body.classList.contains('power-off') && !document.body.classList.contains('miniplayer')) {
+      appEl.classList.add('inactive');
+    }
+  }, waitTime);
+}
+window.addEventListener('mousemove', resetInactiveTimer);
+window.addEventListener('mousedown', resetInactiveTimer);
+window.addEventListener('wheel', resetInactiveTimer);
+resetInactiveTimer();
+
+const dynW    = DYN_K.map(k => buildKnob(k, document.getElementById('knobs-dynamics')));
+const bassW   = BASS_K.map(k => buildKnob(k, document.getElementById('knobs-bass')));
+const trebleW = TREBLE_K.map(k => buildKnob(k, document.getElementById('knobs-treble')));
+const allAdvW = [...dynW, ...bassW, ...trebleW];
+
+// ── Fluid Background Canvas ───────────────────────────────────────────
+const fluidEl = document.getElementById('fluid-bg');
+const fluidCtx = fluidEl.getContext('2d');
+let fluidTime = 0;
+
+function resizeFluid() {
+  fluidEl.width = window.innerWidth;
+  fluidEl.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeFluid);
+resizeFluid();
+
+function boostSaturation(r, g, b, factor) {
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+  let h=0, s=max===0?0:d/max, v=max;
+  if(d!==0){
+    if     (max===r) h=((g-b)/d)%6;
+    else if(max===g) h=(b-r)/d+2;
+    else             h=(r-g)/d+4;
+    h/=6; if(h<0) h+=1;
+  }
+  if (factor <= 1.0) {
+    s = s * Math.max(0, factor);
+  } else {
+    s = Math.min(1.0, s + (1.0 - s) * (factor - 1.0) * 0.85);
+  }
+  const i=Math.floor(h*6), f=h*6-i,
+        p=v*(1-s), q=v*(1-f*s), t=v*(1-(1-f)*s);
+  let ro,go,bo;
+  switch(i%6){
+    case 0:ro=v;go=t;bo=p;break; case 1:ro=q;go=v;bo=p;break;
+    case 2:ro=p;go=v;bo=t;break; case 3:ro=p;go=q;bo=v;break;
+    case 4:ro=t;go=p;bo=v;break; case 5:ro=v;go=p;bo=q;break;
+  }
+  return [ro*255, go*255, bo*255];
+}
+
+function p3(r, g, b, a=1) {
+  return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${a.toFixed(3)})`;
+}
+
+function drawFluid(pal, bass, treble) {
+  if (!pal || !pal.length) return;
+  const W = fluidEl.width, H = fluidEl.height;
+  fluidCtx.clearRect(0,0,W,H);
+
+  const sat     = cache.knobs ? (cache.knobs.saturation ?? 1.4) : 1.4;
+  const bgLevel = cache.knobs ? (cache.knobs.brightness ?? 0.15) : 0.15;
+  const boosted = pal.map(([r,g,b]) => boostSaturation(r, g, b, sat));
+
+  fluidTime += 0.005 + (bass * 0.02);
+
+  // Background ambient (pal[0])
+  fluidCtx.fillStyle = p3(...boosted[0], Math.min(1.0, 0.45 + bgLevel * 1.2));
+  fluidCtx.fillRect(0, 0, W, H);
+
+  // We use 'lighten' instead of 'screen' or 'lighter' (additive).
+  // 'lighten' takes max(src, dst) per channel, preserving hue separation
+  // at high overlap/intensities without blowing out to white.
+  fluidCtx.globalCompositeOperation = 'lighten';
+
+  // Multiple Bass Blobs
+  const bScale = 1.0 + (bass * 1.5);
+  for (let i = 0; i < 4; i++) {
+      const phase = i * Math.PI / 2;
+      const bX = W * 0.5 + Math.sin(fluidTime * (0.8 + i*0.1) + phase) * (W * 0.4);
+      const bY = H * 0.5 + Math.cos(fluidTime * (0.6 + i*0.1) - phase) * (H * 0.4);
+      const bRadius = (Math.min(W, H) * (0.18 + i*0.03)) * bScale;
+      
+      const bgRad = fluidCtx.createRadialGradient(bX, bY, 0, bX, bY, bRadius);
+      bgRad.addColorStop(0, p3(...boosted[1], 0.4));
+      bgRad.addColorStop(1, p3(...boosted[1], 0));
+      fluidCtx.fillStyle = bgRad;
+      fluidCtx.beginPath(); fluidCtx.arc(bX, bY, bRadius, 0, Math.PI*2); fluidCtx.fill();
+  }
+
+  // Multiple Treble Blobs
+  const tScale = 0.8 + (treble * 2.0);
+  for (let i = 0; i < 5; i++) {
+      const phase = i * Math.PI * 0.4;
+      const tX = W * 0.5 + Math.cos(fluidTime * (1.4 + i*0.2) + phase) * (W * 0.45) + (Math.random() - 0.5) * treble * 150;
+      const tY = H * 0.5 + Math.sin(fluidTime * (1.7 + i*0.2) - phase) * (H * 0.45) + (Math.random() - 0.5) * treble * 150;
+      const tRadius = (Math.min(W, H) * (0.12 + i*0.03)) * tScale;
+      
+      const tgRad = fluidCtx.createRadialGradient(tX, tY, 0, tX, tY, tRadius);
+      tgRad.addColorStop(0, p3(...boosted[2], 0.5));
+      tgRad.addColorStop(1, p3(...boosted[2], 0));
+      fluidCtx.fillStyle = tgRad;
+      fluidCtx.beginPath(); fluidCtx.arc(tX, tY, tRadius, 0, Math.PI*2); fluidCtx.fill();
+  }
+
+  fluidCtx.globalCompositeOperation = 'source-over';
+}
+
+// ── Segment Manager ────────────────────────────────────────────────────
+const SEG_COLORS = [
+  '#00f0ff', '#ff007f', '#a855f7', '#00dfd8', '#f59e0b', '#10b981', '#6366f1', '#ec4899'
+];
+
+let localSegments = null;
+let localSegmentMode = 'independent';
+let segmentsSeeded = false;
+
+function setSegmentMode(mode) {
+  localSegmentMode = mode;
+  ['indep', 'overlay', 'cont'].forEach(m => {
+    const id = `btn-mode-${m}`;
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    const match = (m === 'indep' && mode === 'independent') ||
+                  (m === 'overlay' && mode === 'overlay') ||
+                  (m === 'cont' && mode === 'continuous');
+    btn.classList.toggle('active', match);
+  });
+  wsSend({ type: 'set_segment_mode', mode: mode });
+}
+
+function renderMinimap() {
+  const minimap = document.getElementById('seg-minimap');
+  const coverageStat = document.getElementById('seg-coverage-stat');
+  if (!minimap || !localSegments) return;
+
+  const totalLeds = parseInt(document.getElementById('cfg-leds')?.value) || (cache.knobs ? cache.knobs.led_count : 197) || 197;
+  minimap.innerHTML = '';
+  let mappedCount = 0;
+
+  localSegments.forEach((seg, idx) => {
+    const start = parseInt(seg[0]);
+    const stop = parseInt(seg[1]);
+    const validStart = isNaN(start) ? 0 : Math.max(0, start);
+    const validStop = isNaN(stop) ? validStart : Math.max(validStart, stop);
+    const len = Math.max(0, validStop - validStart);
+    mappedCount += len;
+    const color = SEG_COLORS[idx % SEG_COLORS.length];
+
+    const block = document.createElement('div');
+    block.className = 'seg-minimap-block';
+    const pct = totalLeds > 0 ? (len / totalLeds) * 100 : 0;
+    block.style.width = `${pct}%`;
+    block.style.background = color;
+    block.title = `Segment ${idx}: ${validStart} - ${validStop} (${len} LEDs)`;
+    if (pct > 7) block.textContent = `S${idx}`;
+    minimap.appendChild(block);
+
+    const badge = document.getElementById(`seg-badge-${idx}`);
+    if (badge) badge.textContent = `${len} LEDs`;
+  });
+
+  if (coverageStat) {
+    coverageStat.textContent = `${mappedCount} / ${totalLeds} LEDs`;
+    coverageStat.style.color = mappedCount === totalLeds ? 'var(--accent)' : '#ffaa00';
+  }
+}
+
+function buildSegmentCards() {
+  const container = document.getElementById('seg-cards');
+  if (!container || !localSegments) return;
+
+  const count = localSegments.length || 1;
+  const segItem = document.getElementById('acc-segments');
+
+  const totalLeds = parseInt(document.getElementById('cfg-leds')?.value) || (cache.knobs ? cache.knobs.led_count : 197) || 197;
+  container.innerHTML = '';
+
+  localSegments.forEach((seg, idx) => {
+    const start = seg[0];
+    const stop = seg[1];
+    const len = Math.max(0, (parseInt(stop) || 0) - (parseInt(start) || 0));
+    const color = SEG_COLORS[idx % SEG_COLORS.length];
+
+    const card = document.createElement('div');
+    card.className = 'seg-card';
+    card.id = `seg-card-${idx}`;
+    card.innerHTML = `
+      <div class="seg-card-header">
+        <div class="seg-card-title">
+          <span class="seg-dot" style="background:${color};box-shadow:0 0 8px ${color}"></span>
+          <span>Segment ${idx}</span>
+          <span class="seg-badge" id="seg-badge-${idx}">${len} LEDs</span>
+        </div>
+        ${localSegments.length > 1 ? `<button class="seg-del-btn" title="Remove Segment" onclick="removeSegment(${idx})">&times;</button>` : ''}
+      </div>
+      <div class="seg-inputs-row">
+        <div class="seg-input-group">
+          <span class="seg-input-label">Start</span>
+          <input class="seg-num-input" id="seg-in-start-${idx}" type="number" min="0" max="${totalLeds}" value="${start}"
+                 oninput="onSegmentInput(${idx}, 'start', this.value)"
+                 onblur="onSegmentBlur(${idx}, 'start', this.value)"/>
+        </div>
+        <div class="seg-input-group">
+          <span class="seg-input-label">Stop</span>
+          <input class="seg-num-input" id="seg-in-stop-${idx}" type="number" min="0" max="${totalLeds}" value="${stop}"
+                 oninput="onSegmentInput(${idx}, 'stop', this.value)"
+                 onblur="onSegmentBlur(${idx}, 'stop', this.value)"/>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  renderMinimap();
+}
+
+function onSegmentInput(idx, field, val) {
+  if (!localSegments || !localSegments[idx]) return;
+  if (val === '') {
+    localSegments[idx][field === 'start' ? 0 : 1] = '';
+  } else {
+    localSegments[idx][field === 'start' ? 0 : 1] = parseInt(val);
+  }
+  renderMinimap();
+}
+
+function onSegmentBlur(idx, field, val) {
+  if (!localSegments || !localSegments[idx]) return;
+  const totalLeds = parseInt(document.getElementById('cfg-leds')?.value) || (cache.knobs ? cache.knobs.led_count : 197) || 197;
+  let num = parseInt(val);
+  if (isNaN(num)) {
+    num = field === 'start' ? 0 : totalLeds;
+  }
+  num = Math.max(0, Math.min(totalLeds, num));
+  localSegments[idx][field === 'start' ? 0 : 1] = num;
+
+  const inputEl = document.getElementById(`seg-in-${field}-${idx}`);
+  if (inputEl) inputEl.value = num;
+
+  renderMinimap();
+}
+
+function addSegment() {
+  if (!localSegments) localSegments = [];
+  const totalLeds = parseInt(document.getElementById('cfg-leds')?.value) || (cache.knobs ? cache.knobs.led_count : 197) || 197;
+  const lastStop = localSegments.length > 0 ? (parseInt(localSegments[localSegments.length - 1][1]) || 0) : 0;
+  const newStop = Math.min(totalLeds, lastStop + 30);
+  localSegments.push([lastStop, Math.max(lastStop + 1, newStop)]);
+  buildSegmentCards();
+}
+
+function removeSegment(idx) {
+  if (!localSegments || localSegments.length <= 1) return;
+  localSegments.splice(idx, 1);
+  buildSegmentCards();
+}
+
+function saveSegments() {
+  if (!localSegments || !localSegments.length) return;
+  const totalLeds = parseInt(document.getElementById('cfg-leds')?.value) || (cache.knobs ? cache.knobs.led_count : 197) || 197;
+
+  const sanitized = localSegments.map(seg => {
+    let st = parseInt(seg[0]);
+    let en = parseInt(seg[1]);
+    if (isNaN(st)) st = 0;
+    if (isNaN(en)) en = totalLeds;
+    st = Math.max(0, Math.min(totalLeds, st));
+    en = Math.max(st + 1, Math.min(totalLeds, en));
+    return [st, en];
+  });
+
+  localSegments = sanitized;
+  buildSegmentCards();
+
+  wsSend({ type: 'set_segments', segments: sanitized });
+  wsSend({ type: 'set_segment_mode', mode: localSegmentMode });
+
+  const btn = document.getElementById('seg-save-btn');
+  if (btn) {
+    const orig = btn.textContent;
+    btn.textContent = 'Applied ✓';
+    setTimeout(() => { btn.textContent = orig; }, 1200);
+  }
+}
+
+// ── Configure ─────────────────────────────────────────────────────────
+function applyCfg(){
+  const ip  =document.getElementById('cfg-ip').value.trim();
+  const leds=parseInt(document.getElementById('cfg-leds').value);
+  if(ip)           wsSend({type:'knob',key:'wled_ip',  value:ip});
+  if(!isNaN(leds)) wsSend({type:'knob',key:'led_count',value:leds});
+}
+
+// ── Frame handler ──────────────────────────────────────────────────────
+function onFrame(data){
+  if(activeDrags === 0){
+    cache = data;
+  } else {
+    cache.bass    = data.bass;
+    cache.treble  = data.treble;
+    cache.palette = data.palette;
+    cache.art     = data.art;
+    cache.title   = data.title;
+    cache.artist  = data.artist;
+  }
+
+  try {
+    if (data.title !== undefined && (data.title !== window.lastTitle || data.artist !== window.lastArtist)) {
+      window.lastTitle = data.title;
+      window.lastArtist = data.artist;
+      applyMarquee('title-container', 'title-text', data.title);
+      applyMarquee('artist-container', 'artist-text', data.artist);
+      
+      // Instantly flip out the old album art
+      const oldImg = document.getElementById('album-cover');
+      if (oldImg) {
+          oldImg.removeAttribute('id');
+          oldImg.classList.add('art-old');
+          setTimeout(() => { if (oldImg.parentElement) oldImg.parentElement.removeChild(oldImg); }, 1000);
+      }
+    } 
+    
+    if (data.art && data.art !== window.lastArt) {
+        window.lastArt = data.art;
+        const currentCover = document.getElementById('album-cover');
+        if (currentCover) {
+            // Silently upgrade the image resolution without triggering a new flip animation
+            currentCover.src = `data:image/jpeg;base64,${data.art}`;
+        } else {
+            triggerFlipIn(data);
+        }
+    }
+  } catch (e) {
+      console.error(e);
+  }
+
+  function triggerFlipIn(data) {
+    if (!data.art || !data.palette || data.palette.length < 2) return;
+    const wrap = document.getElementById('album-cover-wrap');
+    if (!wrap) return;
+
+    // Build new cover
+    const newImg = document.createElement('img');
+    newImg.id = 'album-cover';
+    newImg.src = `data:image/jpeg;base64,${data.art}`;
+    newImg.className = 'art-cover art-new-start';
+    
+    // Schedule canvas palette transition
+    window.transitionPaletteParams = {
+        startPalette: window.lastPalette || data.palette,
+        startMorphTime: performance.now(),
+        endMorphTime: performance.now() + 600
+    };
+    
+    wrap.appendChild(newImg);
+    
+    // Trigger animation next frame
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (newImg) newImg.classList.remove('art-new-start');
+    }));
+  }
+  
+  window.lastPalette = data.palette;
+
+  let activePalette = data.palette;
+  if (window.transitionPaletteParams) {
+      const p = window.transitionPaletteParams;
+      const now = performance.now();
+      if (now < p.startMorphTime) {
+          activePalette = p.startPalette;
+      } else if (now < p.endMorphTime) {
+          const t = (now - p.startMorphTime) / (p.endMorphTime - p.startMorphTime);
+          activePalette = p.startPalette.map((color, i) => [
+              color[0] + (data.palette[i][0] - color[0]) * t,
+              color[1] + (data.palette[i][1] - color[1]) * t,
+              color[2] + (data.palette[i][2] - color[2]) * t
+          ]);
+      } else {
+          window.transitionPaletteParams = null;
+      }
+  }
+
+  mainW.forEach(w=>w.refresh(data.knobs));
+  
+  if (data.knobs) {
+      document.getElementById('power-toggle').checked = data.knobs.power !== false;
+      if (data.knobs.power === false) {
+          document.body.classList.add('power-off');
+          const appEl = document.getElementById('app');
+          if(appEl) appEl.classList.remove('inactive');
+      } else {
+          document.body.classList.remove('power-off');
+      }
+      
+      if (document.getElementById('arc-toggle')) {
+          const arcOn = data.knobs.arc_enabled === true;
+          document.getElementById('arc-toggle').checked = arcOn;
+          const dynGrid = document.getElementById('knobs-dynamics');
+          if (dynGrid) {
+              if (arcOn) dynGrid.classList.add('arc-dimmed');
+              else dynGrid.classList.remove('arc-dimmed');
+          }
+      }
+      const sat = data.knobs.saturation;
+      if (document.activeElement !== document.getElementById('vibe-slider')) {
+        let val = 2; // Accurate default
+        if (sat < 0.135) val = 0;
+        else if (sat < 0.435) val = 1;
+        else if (sat < 0.84) val = 2;
+        else val = 3;
+        document.getElementById('vibe-slider').value = val;
+      }
+  }
+  let visKnobs = data.knobs ? Object.assign({}, data.knobs) : null;
+  const now = performance.now();
+  if (visKnobs && data.arc_mult !== undefined) {
+    if (typeof window.lastArcVisUpdate === 'undefined') {
+      window.lastArcVisUpdate = 0;
+      window.targetArcMult = 1.0;
+    }
+    if (now - window.lastArcVisUpdate > 1000) {
+      window.targetArcMult = data.arc_mult;
+      window.lastArcVisUpdate = now;
+    }
+    if (visKnobs.arc_enabled !== false && window.targetArcMult > 1.02) {
+      // Simulate faster envelope settings visually
+      const diff = window.targetArcMult - 1.0;
+      visKnobs.responsiveness = Math.min(0.60, visKnobs.responsiveness + diff * 0.1);
+      visKnobs.decay_gamma = Math.max(0.8, visKnobs.decay_gamma - diff * 0.25);
+      visKnobs.attack_gamma = Math.max(1.0, visKnobs.attack_gamma - diff * 0.25);
+    }
+  }
+
+  allAdvW.forEach(w =>w.refresh(visKnobs || data.knobs));
+
+  if(!cfgSeeded && data.knobs && data.knobs.wled_ip){
+    document.getElementById('cfg-ip').value  =data.knobs.wled_ip;
+    document.getElementById('cfg-leds').value=data.knobs.led_count;
+    cfgSeeded=true;
+  }
+
+  if (data.knobs && data.knobs.led_count) {
+    const wledStat = document.getElementById('acc-wled-stat');
+    if (wledStat) wledStat.textContent = `${data.knobs.led_count} LEDs`;
+  }
+
+  if (!segmentsSeeded && data.segments && data.segments.length) {
+    localSegments = JSON.parse(JSON.stringify(data.segments));
+    localSegmentMode = data.segment_mode || 'independent';
+    setSegmentMode(localSegmentMode);
+    buildSegmentCards();
+    segmentsSeeded = true;
+  }
+
+  if (data.segment_mode) {
+    const segStat = document.getElementById('acc-seg-stat');
+    if (segStat) segStat.textContent = data.segment_mode.charAt(0).toUpperCase() + data.segment_mode.slice(1);
+  }
+
+  if (!document.body.classList.contains('power-off')) {
+      drawFluid(data.palette, data.bass, data.treble);
+  }
+}
+
+const wizardSteps = [
+    { name: "CYAN", color: [0,255,255], hex: "#00FFFF", left: "More Green", right: "More Blue", lc: "#44ff44", rc: "#4444ff" },
+    { name: "YELLOW", color: [255,255,0], hex: "#FFFF00", left: "More Red", right: "More Green", lc: "#ff4444", rc: "#44ff44" },
+    { name: "MAGENTA", color: [255,0,255], hex: "#FF00FF", hideSlider: true, msg: "Verify that Magenta looks balanced without further adjustments." },
+    { name: "WHITE", color: [255,255,255], hex: "#FFFFFF", hideSlider: true, msg: "Verify that White looks balanced and correct." }
+];
+
+let cwStep = 0;
+window.currentCalibR = 1.0;
+window.currentCalibG = 1.0;
+window.currentCalibB = 1.0;
+
+function openCalibModal() {
+    cwStep = 0;
+    document.getElementById('calib-modal').style.display = 'flex';
+    wsSend({ type: "knob", key: "calib_mode", value: true });
+    
+    // Reset multipliers for a clean run
+    window.currentCalibR = 1.0;
+    window.currentCalibG = 1.0;
+    window.currentCalibB = 1.0;
+    wsSend({ type: "knob", key: "calib_r", value: 1.0 });
+    wsSend({ type: "knob", key: "calib_g", value: 1.0 });
+    wsSend({ type: "knob", key: "calib_b", value: 1.0 });
+    
+    renderCalibStep();
+}
+
+function closeCalibModal() {
+    document.getElementById('calib-modal').style.display = 'none';
+    wsSend({ type: "knob", key: "calib_mode", value: false });
+}
+
+function renderCalibStep() {
+    const s = wizardSteps[cwStep];
+    document.getElementById('calib-swatch').style.background = s.hex;
+    document.getElementById('calib-swatch-title').textContent = s.name;
+    document.getElementById('calib-swatch').style.boxShadow = `0 0 20px ${s.hex}66`;
+    document.getElementById('calib-swatch-title').style.color = (cwStep===3) ? 'black' : 'white';
+    if(cwStep===1) document.getElementById('calib-swatch-title').style.color = 'black'; // Yellow
+    if(cwStep===0) document.getElementById('calib-swatch-title').style.color = 'black'; // Cyan
+    
+    if (s.hideSlider) {
+        document.getElementById('calib-slider-container').style.display = 'none';
+        document.getElementById('calib-instructions').textContent = s.msg;
+    } else {
+        document.getElementById('calib-slider-container').style.display = 'flex';
+        document.getElementById('calib-label-left').textContent = s.left;
+        document.getElementById('calib-label-left').style.color = s.lc || 'white';
+        document.getElementById('calib-label-right').textContent = s.right;
+        document.getElementById('calib-label-right').style.color = s.rc || 'white';
+        
+        document.getElementById('calib-balance').value = 0.5;
+        document.getElementById('calib-instructions').textContent = "Adjust the slider until the color on your LEDs perfectly matches the color above.";
+        
+        window.calibSnapshotR = window.currentCalibR;
+        window.calibSnapshotG = window.currentCalibG;
+        window.calibSnapshotB = window.currentCalibB;
+    }
+    
+    document.getElementById('calib-prev').disabled = (cwStep === 0);
+    document.getElementById('calib-prev').style.opacity = (cwStep === 0) ? 0.3 : 1;
+    document.getElementById('calib-next').textContent = (cwStep === wizardSteps.length - 1) ? "Finish & Save" : "Next Step";
+    
+    wsSend({ type: "knob", key: "calib_color", value: s.color });
+}
+
+function calibPrev() { if (cwStep > 0) { cwStep--; renderCalibStep(); } }
+function calibNext() { 
+    if (cwStep < wizardSteps.length - 1) { 
+        cwStep++; 
+        renderCalibStep(); 
+    } else {
+        closeCalibModal();
+    }
+}
+
+function updateCalibMath() {
+    const s = wizardSteps[cwStep];
+    if (s.hideSlider) return;
+    
+    let v = parseFloat(document.getElementById('calib-balance').value);
+    const scaleLeft = Math.min(1.0, (1.0 - v) * 2);
+    const scaleRight = Math.min(1.0, v * 2);
+
+    if (cwStep === 0) {
+        window.currentCalibR = window.calibSnapshotR;
+        window.currentCalibG = window.calibSnapshotG * scaleLeft;
+        window.currentCalibB = window.calibSnapshotB * scaleRight;
+    } else if (cwStep === 1) {
+        window.currentCalibR = window.calibSnapshotR * scaleLeft;
+        window.currentCalibG = window.calibSnapshotG * scaleRight;
+        window.currentCalibB = window.calibSnapshotB;
+    }
+    
+    wsSend({ type: "knob", key: "calib_r", value: window.currentCalibR });
+    wsSend({ type: "knob", key: "calib_g", value: window.currentCalibG });
+    wsSend({ type: "knob", key: "calib_b", value: window.currentCalibB });
+}
+
+// ── Accordion toggle & hover-expand ────────────────────────────────────
+let accHoverTimer = null;
+
+function openAccordion(el) {
+  if (!el || el.classList.contains('open')) return;
+  document.querySelectorAll('.acc-item').forEach(item => {
+    if (item !== el) item.classList.remove('open');
+  });
+  el.classList.add('open');
+  setTimeout(() => {
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 100);
+}
+
+function toggleAccordion(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.classList.contains('open')) {
+    el.classList.remove('open');
+  } else {
+    openAccordion(el);
+  }
+}
+
+function setupAccordionHover() {
+  document.querySelectorAll('.acc-item').forEach(item => {
+    item.addEventListener('mouseenter', () => {
+      // Do not collapse or switch if the user is dragging a knob or focused on an input
+      if (activeDrags > 0) return;
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'BUTTON') && activeEl.closest('.acc-item')) {
+        return;
+      }
+
+      clearTimeout(accHoverTimer);
+      accHoverTimer = setTimeout(() => {
+        if (activeDrags > 0) return;
+        openAccordion(item);
+      }, 90);
+    });
+
+    item.addEventListener('mouseleave', () => {
+      clearTimeout(accHoverTimer);
+    });
+  });
+}
+setupAccordionHover();
+
+// ── Global Top-Layer Tooltip ───────────────────────────────────────────
+const gTip = document.getElementById('global-tip');
+
+function showGlobalTip(el, tipObj) {
+  if (!gTip || !tipObj) return;
+  if (typeof tipObj === 'string') {
+    gTip.textContent = tipObj;
+  } else {
+    gTip.innerHTML = `
+      <div class="tip-desc">${tipObj.desc}</div>
+      <div class="tip-line"><span class="tip-tag hi">High &rarr;</span><span>${tipObj.high}</span></div>
+      <div class="tip-line"><span class="tip-tag lo">Low &rarr;</span><span>${tipObj.low}</span></div>
+    `;
+  }
+  const rect = el.getBoundingClientRect();
+  const x = Math.round(rect.left + rect.width / 2);
+  let y = rect.top - 8;
+  if (y < 70) {
+    gTip.style.top = `${Math.round(rect.bottom + 8)}px`;
+    gTip.style.bottom = 'auto';
+  } else {
+    gTip.style.top = 'auto';
+    gTip.style.bottom = `${Math.round(window.innerHeight - y)}px`;
+  }
+  const clampedX = Math.max(115, Math.min(window.innerWidth - 115, x));
+  gTip.style.left = `${clampedX}px`;
+  gTip.classList.add('visible');
+}
+
+function hideGlobalTip() {
+  if (!gTip) return;
+  gTip.classList.remove('visible');
+}
+
+window.addEventListener('scroll', hideGlobalTip, true);
+
+// ── Settings toggle ────────────────────────────────────────────────────
+function toggleSettings(){
+  hideGlobalTip();
+  const s=document.getElementById('settings');
+  const open=s.classList.toggle('open');
+  document.getElementById('hb-btn').classList.toggle('open',open);
+}
+
+// Dev shortcut: Allow F5 to reload the UI
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'F5') {
+    e.preventDefault();
+    window.location.reload();
+  }
+});
+
+// ── Resize ─────────────────────────────────────────────────────────────
+function resize(){
+  if (typeof fluidEl !== 'undefined' && fluidEl) {
+    fluidEl.width  = fluidEl.offsetWidth;
+    fluidEl.height = fluidEl.offsetHeight;
+  }
+  setTimeout(() => {
+    if (cache.title) applyMarquee('title-container', 'title-text', cache.title);
+    if (cache.artist) applyMarquee('artist-container', 'artist-text', cache.artist);
+  }, 50);
+}
+window.onresize=resize;
+resize();
+</script>
+</body>
+</html>
