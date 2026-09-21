@@ -404,6 +404,15 @@ def audio_listener(client: WLEDClient):
     ff = np.fft.rfftfreq(CHUNK, 1.0 / SAMPLE_RATE)
     fs = np.fft.rfftfreq(BASS_WINDOW, 1.0 / SAMPLE_RATE)
 
+    # ── Precompute Frequency Weight Curves ──
+    # Bass weights: 1.5x at ~50Hz, 1.2x at ~120Hz, rolling off towards 250Hz.
+    b_idx = np.where(fs < BASS_CUTOFF_HZ)[0]
+    bass_weights = 0.5 + 1.0 * np.exp(-((fs[b_idx] - 50.0) ** 2) / (2 * 60.0 ** 2))
+
+    # Treble weights: 0.8x in lower treble, scaling up to 1.4x higher up
+    t_idx = np.where(ff > TREBLE_CUTOFF)[0]
+    treble_weights = 0.8 + 0.6 * np.clip((ff[t_idx] - 2000.0) / 8000.0, 0, 1.0)
+
     while state.running:
         try:
             spk = sc.default_speaker()
@@ -429,6 +438,10 @@ def audio_listener(client: WLEDClient):
         arc_avg_t = 0.0
         arc_peak_t = 0.0
         arc_mult_t = 1.0
+        
+        # Transient Envelope Tracking Arrays
+        bass_avg_env = np.zeros(len(b_idx))
+        treble_avg_env = np.zeros(len(t_idx))
 
         try:
             with mic.recorder(samplerate=SAMPLE_RATE, blocksize=CHUNK) as rec:
@@ -442,16 +455,36 @@ def audio_listener(client: WLEDClient):
                         client.clear_dither(n)
 
                     fft_f = np.abs(np.fft.rfft(data))
-                    t_idx = np.where(ff > TREBLE_CUTOFF)[0]
-                    raw_t_inst = np.mean(fft_f[t_idx]) if len(t_idx) else 0
-                    raw_t_smooth = raw_t_smooth * 0.35 + raw_t_inst * 0.65
+                    if len(t_idx) > 0:
+                        # Treble Transient Isolation
+                        t_mags = fft_f[t_idx]
+                        # Slower envelope tracking makes the transient wider and less "sparky"
+                        treble_avg_env = treble_avg_env * 0.95 + t_mags * 0.05
+                        transient_t = np.maximum(0, t_mags - treble_avg_env)
+                        raw_t_inst = np.mean(transient_t * treble_weights) * 2.5  # Rebalanced scale
+                    else:
+                        raw_t_inst = 0.0
+                        
+                    # Asymmetric smoothing to kill the "fused capacitor" jitter
+                    if raw_t_inst > raw_t_smooth:
+                        raw_t_smooth = raw_t_smooth * 0.5 + raw_t_inst * 0.5   # Crisp attack
+                    else:
+                        raw_t_smooth = raw_t_smooth * 0.85 + raw_t_inst * 0.15 # Smooth decay
+                        
                     raw_t = raw_t_smooth
 
                     bass_buf = np.roll(bass_buf, -CHUNK)
                     bass_buf[-CHUNK:] = data
                     fft_s = np.abs(np.fft.rfft(bass_buf * np.hanning(BASS_WINDOW)))
-                    b_idx = np.where(fs < BASS_CUTOFF_HZ)[0]
-                    raw_b = np.mean(fft_s[b_idx]) if len(b_idx) else 0
+                    
+                    if len(b_idx) > 0:
+                        # Bass Transient Isolation
+                        b_mags = fft_s[b_idx]
+                        bass_avg_env = bass_avg_env * 0.92 + b_mags * 0.08
+                        transient_b = np.maximum(0, b_mags - bass_avg_env)
+                        raw_b = np.mean(transient_b * bass_weights) * 2.5  # Scale up due to transient extraction
+                    else:
+                        raw_b = 0.0
 
                     if getattr(state, "new_track_flag", False):
                         state.new_track_flag = False
