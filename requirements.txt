@@ -6,3 +6,4 @@ soundcard
 pillow
 winsdk
 pystray
+psutil

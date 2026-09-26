@@ -429,6 +429,7 @@ def audio_listener(client: WLEDClient):
         _cached_n = -1
         _send_interval = 1.0 / SEND_HZ
         _last_send = 0.0
+        _power_was_on = True
         print(f"[audio] opened '{mic.name}'")
 
         # ARC variables
@@ -443,6 +444,11 @@ def audio_listener(client: WLEDClient):
         bass_avg_env = np.zeros(len(b_idx))
         treble_avg_env = np.zeros(len(t_idx))
 
+        # Temporal smoothing for final output arrays
+        r_smooth = None
+        g_smooth = None
+        b_smooth = None
+
         try:
             with mic.recorder(samplerate=SAMPLE_RATE, blocksize=CHUNK) as rec:
                 while state.running:
@@ -451,8 +457,11 @@ def audio_listener(client: WLEDClient):
                         _cached_n = n
 
                     data = rec.record(numframes=CHUNK)[:, 0]
-                    if np.sqrt(np.mean(data ** 2)) < SILENCE_THRESHOLD:
+                    # Hard noise gate to kill ambient floor
+                    ng = getattr(state, "noise_gate", 0.002)
+                    if np.sqrt(np.mean(data ** 2)) < ng:
                         client.clear_dither(n)
+                        data = np.zeros_like(data)
 
                     fft_f = np.abs(np.fft.rfft(data))
                     if len(t_idx) > 0:
@@ -603,18 +612,39 @@ def audio_listener(client: WLEDClient):
                             bg_col, c2, c3,
                         )
                     
+                    if r_smooth is None or len(r_smooth) != n:
+                        r_smooth = np.array(r, dtype=float)
+                        g_smooth = np.array(g, dtype=float)
+                        b_smooth = np.array(b, dtype=float)
+                    else:
+                        # EMA low-pass filter to prevent high-frequency jittering/flickering
+                        # alpha = 0.25 (25% new frame, 75% old frame)
+                        alpha = getattr(state, "temporal_smoothing", 0.25)
+                        r_smooth += (r - r_smooth) * alpha
+                        g_smooth += (g - g_smooth) * alpha
+                        b_smooth += (b - b_smooth) * alpha
+
                     # Apply global calibration multipliers
                     cr = getattr(state, "calib_r", 1.0)
                     cg = getattr(state, "calib_g", 1.0)
                     cb = getattr(state, "calib_b", 1.0)
-                    r = np.clip(r * cr, 0, 255).astype(int)
-                    g = np.clip(g * cg, 0, 255).astype(int)
-                    b = np.clip(b * cb, 0, 255).astype(int)
+                    r = np.clip(r_smooth * cr, 0, 255).astype(int)
+                    g = np.clip(g_smooth * cg, 0, 255).astype(int)
+                    b = np.clip(b_smooth * cb, 0, 255).astype(int)
 
                     now = time.monotonic()
                     if now - _last_send >= _send_interval:
-                        client.send_pixels(r, g, b)
-                        _last_send = now
+                        if state.power or getattr(state, "calib_mode", False):
+                            client.send_pixels(r, g, b)
+                            _last_send = now
+                            _power_was_on = True
+                        elif _power_was_on:
+                            # Send a few black frames to ensure UDP delivery, then stop sending
+                            for _ in range(3):
+                                client.send_pixels(r, g, b)
+                                time.sleep(0.005)
+                            _last_send = now
+                            _power_was_on = False
 
         except Exception as e:
             print(f"[audio] error, reconnecting: {e}")
@@ -692,6 +722,8 @@ async def ws_endpoint(ws: WebSocket):
                         state.apply_knob(msg["key"], msg["value"])
                     elif msg.get("type") == "window":
                         _handle_window(msg)
+                    elif msg.get("type") == "reset_defaults":
+                        state.reset_defaults()
                     elif msg.get("type") == "set_segments":
                         segs = msg.get("segments", [])
                         cleaned = []

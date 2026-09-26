@@ -40,19 +40,18 @@ echo       Done.
 
 :: ---------- 5. Verify output ----------
 echo [3/4] Checking output...
-if not exist "dist\RaveMode\RaveMode.exe" (
-    echo [WARNING] dist\RaveMode\RaveMode.exe was not found — check PyInstaller output.
+if not exist "dist\RaveMode.exe" (
+    echo [WARNING] dist\RaveMode.exe was not found — check PyInstaller output.
 ) else (
-    echo       dist\RaveMode\RaveMode.exe  —  OK
+    echo       dist\RaveMode.exe  —  OK
 )
 
 :: ---------- 6. Done ----------
 echo [4/4] Build complete!
 echo.
-echo  Output folder:  dist\RaveMode\
-echo  Run the app  :  dist\RaveMode\RaveMode.exe
+echo  Output folder:  dist\
+echo  Run the app  :  dist\RaveMode.exe
 echo.
-echo  To distribute, zip or copy the entire dist\RaveMode\ folder.
-echo  The .exe will NOT work if moved out of that folder on its own.
+echo  To distribute, you can copy the standalone RaveMode.exe file anywhere you like!
 echo.
 pause

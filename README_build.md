@@ -39,15 +39,11 @@ The script will:
 
 ```
 dist/
-└── RaveMode/           ← distribute this whole folder
-    ├── RaveMode.exe
-    ├── ui/
-    │   └── index.html
-    └── ... (DLLs, pywebview resources, etc.)
+└── RaveMode.exe        ← distribute this standalone executable
 ```
 
-**To share the app:** zip or copy the entire `dist\RaveMode\` folder.  
-The `.exe` alone will not run — it needs the sibling files.
+**To share the app:** just send or copy the `RaveMode.exe` file.  
+The `.exe` bundles everything it needs internally.
 
 ---
 

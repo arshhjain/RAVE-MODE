@@ -1184,6 +1184,13 @@ body.power-off .marquee-content {
               <span class="knob-label">LED Count</span>
               <input class="cfg-input" id="cfg-leds" type="number" placeholder="144" oninput="if(typeof renderMinimap==='function')renderMinimap()"/>
             </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span class="knob-label">Isolate RGB Software</span>
+              <label class="power-switch" style="opacity:1; margin:0; width:34px; height:20px;">
+                <input type="checkbox" id="signalrgb-toggle" onchange="wsSend({type:'knob', key:'isolate_rgb', value:this.checked})">
+                <span class="power-slider"></span>
+              </label>
+            </div>
             <button class="apply-btn" onclick="applyCfg()">Save & Sync</button>
             
             <div style="width:100%; height:1px; background:rgba(255,255,255,0.1); margin:10px 0;"></div>
@@ -1191,6 +1198,9 @@ body.power-off .marquee-content {
               <span class="knob-label">Hardware Calibration</span>
               <button class="apply-btn" style="width:auto; padding:6px 12px; margin:0;" onclick="openCalibModal()">Open Wizard</button>
             </div>
+            
+            <div style="width:100%; height:1px; background:rgba(255,255,255,0.1); margin:10px 0;"></div>
+            <button class="apply-btn" style="background:rgba(255,50,50,0.15); border:1px solid rgba(255,50,50,0.3); color:#ff7777;" onclick="resetDefaults()">Reset to Defaults</button>
           </div>
         </div>
       </div>
@@ -1384,6 +1394,14 @@ const DYN_K = [
       low: 'Long, lingering sustained light'
     }
   },
+  {
+    key: 'noise_gate', label: 'Noise Gate', mn: 0.0005, mx: 0.015, log: 1,
+    tip: {
+      desc: 'Ambient silence threshold.',
+      high: 'Strict gate (kills quiet AC/fans)',
+      low: 'Loose gate (picks up everything)'
+    }
+  }
 ];
 const BASS_K = [
   {
@@ -1881,6 +1899,12 @@ function saveSegments() {
   }
 }
 
+function resetDefaults() {
+  if (confirm("Are you sure you want to reset all tuning knobs to their defaults? (Network and LED settings will be preserved)")) {
+    wsSend({ type: "reset_defaults" });
+  }
+}
+
 // ── Configure ─────────────────────────────────────────────────────────
 function applyCfg(){
   const ip  =document.getElementById('cfg-ip').value.trim();
@@ -1998,6 +2022,11 @@ function onFrame(data){
               if (arcOn) dynGrid.classList.add('arc-dimmed');
               else dynGrid.classList.remove('arc-dimmed');
           }
+      }
+      
+      const sigEl = document.getElementById('signalrgb-toggle');
+      if (sigEl) {
+          sigEl.checked = data.knobs.isolate_rgb !== false;
       }
       const sat = data.knobs.saturation;
       if (document.activeElement !== document.getElementById('vibe-slider')) {

@@ -1,4 +1,4 @@
-# Rave Mode 2.0 🎵✨
+# Rave Mode 2.1 🎵✨
 
 > **Turn your room into a living, breathing extension of your sound.**  
 > A real-time, zero-latency system audio visualizer that drives physical WLED strips directly from system loopback audio—no plugins, virtual audio cables, or middlemen required.
@@ -10,7 +10,7 @@
 
 ---
 
-## ⚡ What’s New in v2.0
+## ⚡ What’s New in v2.1
 
 Version 2.0 is a complete ground-up rebuild engineered to adapt seamlessly across genres, improve color fidelity, and bring the ambient physical experience directly onto your desktop.
 

@@ -13,36 +13,38 @@ class VisualizerState:
         self.running = True
 
         # Network
-        self.wled_ip   = DEFAULT_IP
-        self.wled_port = DEFAULT_PORT
-        self.led_count = DEFAULT_COUNT
+        self.wled_ip   = ""
+        self.wled_port = 21324
+        self.led_count = 0
 
         self.calib_mode  = False
-        self.calib_color = [0, 255, 255]
+        self.calib_color = [255, 255, 255]
         self.calib_r     = 1.0
         self.calib_g     = 1.0
         self.calib_b     = 1.0
 
         # Main knobs
         self.power          = True
-        self.sensitivity    = 0.8
-        self.brightness     = 0.2
+        self.sensitivity    = 0.485
+        self.brightness     = 0.207
         self.saturation     = 1.0
-        self.responsiveness = 0.5
+        self.responsiveness = 0.019
         self.arc_enabled    = True
+        self.isolate_rgb    = True
+        self.noise_gate     = 0.008
 
         # Advanced knobs
-        self.bass_width       = 30.0
-        self.treble_width     = 30.0
-        self.treble_zone      = 10.0
-        self.treble_sens      = 1.0
-        self.bass_intensity   = 0.08
-        self.treble_intensity = 0.6
-        self.attack_gamma     = 1.3
-        self.decay_gamma      = 1.2
+        self.bass_width       = 117.1
+        self.treble_width     = 98.5
+        self.treble_zone      = 12.0
+        self.treble_sens      = 1.607
+        self.bass_intensity   = 0.199
+        self.treble_intensity = 0.835
+        self.attack_gamma     = 1.38
+        self.decay_gamma      = 0.8
 
         # Segments & Layout
-        self.segments     = [[0, 73], [73, 107], [107, 163], [163, 197]]
+        self.segments     = []
         self.segment_mode = "independent"  # "independent", "overlay", "continuous"
 
         # Media
@@ -59,6 +61,8 @@ class VisualizerState:
         self.live_treble = 0.0
 
         self.load_config()
+        if self.power:
+            self._handle_rgb_isolation(True)
 
     # ------------------------------------------------------------------
     def get_attack_decay(self):
@@ -93,6 +97,8 @@ class VisualizerState:
                 "saturation":       self.saturation,
                 "responsiveness":   self.responsiveness,
                 "arc_enabled":      self.arc_enabled,
+                "isolate_rgb":      getattr(self, "isolate_rgb", True),
+                "noise_gate":       getattr(self, "noise_gate", 0.002),
                 "bass_width":       self.bass_width,
                 "treble_width":     self.treble_width,
                 "treble_zone":      self.treble_zone,
@@ -115,8 +121,49 @@ class VisualizerState:
     # ------------------------------------------------------------------
     def apply_knob(self, key, value):
         if hasattr(self, key):
+            if key == "power" and getattr(self, "power") != value:
+                self._handle_rgb_isolation(value)
+            elif key == "isolate_rgb" and getattr(self, "isolate_rgb", True) != value:
+                if self.power:
+                    self._handle_rgb_isolation(value)
             setattr(self, key, value)
             self._schedule_save()
+
+    def _handle_rgb_isolation(self, pause_rgb: bool):
+        # pause_rgb is True when power is ON (we want to pause them)
+        # or when isolate_rgb goes True while power is ON.
+        # It's False when power is OFF (we want to resume them)
+        # or when isolate_rgb goes False while power is ON.
+        if pause_rgb and not getattr(self, "isolate_rgb", True):
+            return # Don't pause if isolation is disabled
+        threading.Thread(target=self._do_handle_rgb_isolation, args=(pause_rgb,), daemon=True).start()
+
+    def _do_handle_rgb_isolation(self, pause: bool):
+        try:
+            import psutil
+            target_procs = {
+                'signalrgb.exe', 'openrgb.exe', 'icue.exe',
+                'lightingservice.exe', 'rgbfusion.exe', 'ledkeeper2.exe'
+            }
+            count = 0
+            for proc in psutil.process_iter(['name']):
+                name = proc.info.get('name')
+                if name and name.lower() in target_procs:
+                    try:
+                        if pause:
+                            proc.suspend()
+                            count += 1
+                        else:
+                            proc.resume()
+                            count += 1
+                    except psutil.AccessDenied:
+                        print(f"[state] Access denied to {'suspend' if pause else 'resume'} {name}")
+            action = "suspended" if pause else "resumed"
+            print(f"[state] {count} RGB controller(s) {action}")
+        except ImportError:
+            print("[state] psutil not installed, cannot isolate RGB controllers")
+        except Exception as e:
+            print(f"[state] RGB isolation error: {e}")
 
     def _schedule_save(self):
         if hasattr(self, "_save_timer") and self._save_timer is not None:
@@ -145,6 +192,24 @@ class VisualizerState:
                 if hasattr(self, k): setattr(self, k, v)
         except Exception as e:
             print(f"[state] load failed: {e}")
+
+    def reset_defaults(self):
+        self.sensitivity    = 0.485
+        self.brightness     = 0.207
+        self.saturation     = 1.0
+        self.responsiveness = 0.019
+        self.arc_enabled    = True
+        self.isolate_rgb    = True
+        self.noise_gate     = 0.008
+        self.bass_width       = 117.1
+        self.treble_width     = 98.5
+        self.treble_zone      = 12.0
+        self.treble_sens      = 1.607
+        self.bass_intensity   = 0.199
+        self.treble_intensity = 0.835
+        self.attack_gamma     = 1.38
+        self.decay_gamma      = 0.8
+        self._schedule_save()
 
 
 state = VisualizerState()
