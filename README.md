@@ -3,6 +3,7 @@
 > **Turn your room into a living, breathing extension of your sound.**  
 > A real-time, zero-latency system audio visualizer that drives physical WLED strips directly from system loopback audio—no plugins, virtual audio cables, or middlemen required.
 
+[![Download Installer](https://img.shields.io/badge/Download-Rave_Mode_v2.1_Installer-2ea44f?logo=windows)](https://github.com/arshhjain/RAVE-MODE/releases/latest)
 [![Demo Videos](https://img.shields.io/badge/Demo-Google_Drive-blue?logo=google-drive)](https://drive.google.com/drive/folders/1nj2Y85VmDmHyBLojrzciqGqGfaEA986O?usp=sharing)
 [![Platform](https://img.shields.io/badge/Platform-Windows_10%2F11-0078D6?logo=windows)](https://microsoft.com)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python)](https://python.org)
@@ -64,6 +65,12 @@ Consumer LED strips often skew warm or oversaturate mid-tones. v2.0 introduces a
 
 ### Installation
 
+#### Option 1: One-Click Installer (Recommended for Windows)
+[**⬇️ Download Rave Mode v2.1 Installer**](https://github.com/arshhjain/RAVE-MODE/releases/latest)
+
+Simply download `RaveMode_Installer.exe`, run it, and launch Rave Mode from your Start Menu. No Python installation required.
+
+#### Option 2: Run from Source
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/arshhjain/RAVE-MODE.git
