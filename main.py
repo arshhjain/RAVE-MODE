@@ -1,5 +1,5 @@
 import asyncio, base64, colorsys, io, json, math, os, socket, time
-import sys, threading, warnings
+import sys, threading, warnings, queue
 from collections import deque
 
 import numpy as np
@@ -191,11 +191,10 @@ def get_stable_background_color(c1, brightness):
 
 
 # ── per-segment rendering ──────────────────────────────────────────────
-def render_segment(seg_len, b_amp, t_amp, bw, tw, treble_zone,
-                    bg_col, c2, c3, include_treble):
-    """Render one segment's r/g/b arrays. If include_treble is False, the
-    segment gets a bass blob only (used in 'overlay' mode, where treble is
-    added separately across the whole strip afterwards)."""
+def render_segment(start, end, b_amp, t_amp, bw, tw, treble_zone,
+                    bg_col, c2, c3, include_treble, r_out, g_out, b_out):
+    """Render one segment's r/g/b arrays in-place to avoid GC thrashing."""
+    seg_len = end - start
     x = np.arange(seg_len)
     bsh = gaussian(x, seg_len / 2.0, bw, b_amp)
 
@@ -207,14 +206,13 @@ def render_segment(seg_len, b_amp, t_amp, bw, tw, treble_zone,
 
     bg_fac = 1.0 - np.clip(bsh + tsh, 0, 1) * 0.9
 
-    r = np.full(seg_len, bg_col[0]) * bg_fac + bsh * c2[0] + tsh * c3[0]
-    g = np.full(seg_len, bg_col[1]) * bg_fac + bsh * c2[1] + tsh * c3[1]
-    b = np.full(seg_len, bg_col[2]) * bg_fac + bsh * c2[2] + tsh * c3[2]
-    return r, g, b
+    r_out[start:end] = bg_col[0] * bg_fac + bsh * c2[0] + tsh * c3[0]
+    g_out[start:end] = bg_col[1] * bg_fac + bsh * c2[1] + tsh * c3[1]
+    b_out[start:end] = bg_col[2] * bg_fac + bsh * c2[2] + tsh * c3[2]
 
 
-def render_frame(n, b_amp, t_amp, bw, tw, treble_zone, bg_col, c2, c3):
-    """Builds full-strip r/g/b arrays dynamically according to state.segment_mode and state.segments."""
+def render_frame(n, b_amp, t_amp, bw, tw, treble_zone, bg_col, c2, c3, r_out, g_out, b_out):
+    """Builds full-strip r/g/b arrays dynamically into pre-allocated out buffers."""
     mode = getattr(state, "segment_mode", "independent")
     segments = getattr(state, "segments", [[0, n]])
     if not segments:
@@ -226,14 +224,14 @@ def render_frame(n, b_amp, t_amp, bw, tw, treble_zone, bg_col, c2, c3):
         tsh = (gaussian(x, treble_zone, tw, t_amp)
                + gaussian(x, n - treble_zone, tw, t_amp))
         bg_fac = 1.0 - np.clip(bsh + tsh, 0, 1) * 0.9
-        r = np.full(n, bg_col[0]) * bg_fac + bsh * c2[0] + tsh * c3[0]
-        g = np.full(n, bg_col[1]) * bg_fac + bsh * c2[1] + tsh * c3[1]
-        b = np.full(n, bg_col[2]) * bg_fac + bsh * c2[2] + tsh * c3[2]
-        return r, g, b
+        r_out[:] = bg_col[0] * bg_fac + bsh * c2[0] + tsh * c3[0]
+        g_out[:] = bg_col[1] * bg_fac + bsh * c2[1] + tsh * c3[1]
+        b_out[:] = bg_col[2] * bg_fac + bsh * c2[2] + tsh * c3[2]
+        return
 
-    r = np.zeros(n)
-    g = np.zeros(n)
-    b = np.zeros(n)
+    r_out.fill(0)
+    g_out.fill(0)
+    b_out.fill(0)
 
     include_local_treble = mode == "independent"
     for seg in segments:
@@ -244,24 +242,19 @@ def render_frame(n, b_amp, t_amp, bw, tw, treble_zone, bg_col, c2, c3):
         end = max(0, min(end, n))
         if start >= end:
             continue
-        seg_len = end - start
-        sr, sg, sb = render_segment(
-            seg_len, b_amp, t_amp, bw, tw, treble_zone,
+        render_segment(
+            start, end, b_amp, t_amp, bw, tw, treble_zone,
             bg_col, c2, c3, include_local_treble,
+            r_out, g_out, b_out
         )
-        r[start:end] = sr
-        g[start:end] = sg
-        b[start:end] = sb
 
     if mode == "overlay":
         x = np.arange(n)
         tsh = (gaussian(x, treble_zone, tw, t_amp)
                + gaussian(x, n - treble_zone, tw, t_amp))
-        r += tsh * c3[0]
-        g += tsh * c3[1]
-        b += tsh * c3[2]
-
-    return r, g, b
+        r_out += tsh * c3[0]
+        g_out += tsh * c3[1]
+        b_out += tsh * c3[2]
 
 
 # ── WLED client ────────────────────────────────────────────────────────
@@ -271,6 +264,25 @@ class WLEDClient:
         self._init_socket()
         self.errors = np.zeros((2000, 3))
         self._last_err_time = 0.0
+        self._queue = queue.Queue(maxsize=2)
+        self._sender_thread = threading.Thread(target=self._sender_loop, daemon=True)
+        self._sender_thread.start()
+
+    def _sender_loop(self):
+        while True:
+            try:
+                r, g, b = self._queue.get()
+                self._send_pixels_internal(r, g, b)
+            except Exception:
+                pass
+
+    def send_pixels(self, r, g, b):
+        if self._queue.full():
+            try:
+                self._queue.get_nowait()
+            except queue.Empty:
+                pass
+        self._queue.put((r, g, b))
 
     def _init_socket(self):
         try:
@@ -284,7 +296,7 @@ class WLEDClient:
         except Exception:
             pass
 
-    def send_pixels(self, r, g, b):
+    def _send_pixels_internal(self, r, g, b):
         n = len(r)
         # 1. Perceptual gamma 2.0 correction (CIE lightness curve)
         # Cushions low-level jumps so near-off to bright transitions bloom smoothly
@@ -448,6 +460,11 @@ def audio_listener(client: WLEDClient):
         r_smooth = None
         g_smooth = None
         b_smooth = None
+        
+        # Pre-allocated arrays to eliminate GC churn
+        r_out = None
+        g_out = None
+        b_out = None
 
         try:
             with mic.recorder(samplerate=SAMPLE_RATE, blocksize=CHUNK) as rec:
@@ -455,6 +472,12 @@ def audio_listener(client: WLEDClient):
                     n = int(state.led_count)
                     if n != _cached_n:
                         _cached_n = n
+                        r_out = np.zeros(n)
+                        g_out = np.zeros(n)
+                        b_out = np.zeros(n)
+                        r_smooth = np.zeros(n)
+                        g_smooth = np.zeros(n)
+                        b_smooth = np.zeros(n)
 
                     data = rec.record(numframes=CHUNK)[:, 0]
                     # Hard noise gate to kill ambient floor
@@ -603,26 +626,25 @@ def audio_listener(client: WLEDClient):
 
                     if getattr(state, "calib_mode", False):
                         cc = getattr(state, "calib_color", [0, 255, 255])
-                        r, g, b = np.full(n, cc[0]), np.full(n, cc[1]), np.full(n, cc[2])
+                        r_out.fill(cc[0])
+                        g_out.fill(cc[1])
+                        b_out.fill(cc[2])
                     elif not state.power:
-                        r, g, b = np.zeros(n, dtype=int), np.zeros(n, dtype=int), np.zeros(n, dtype=int)
+                        r_out.fill(0)
+                        g_out.fill(0)
+                        b_out.fill(0)
                     else:
-                        r, g, b = render_frame(
+                        render_frame(
                             n, b_amp, t_amp, bw, tw, state.treble_zone,
-                            bg_col, c2, c3,
+                            bg_col, c2, c3, r_out, g_out, b_out
                         )
                     
-                    if r_smooth is None or len(r_smooth) != n:
-                        r_smooth = np.array(r, dtype=float)
-                        g_smooth = np.array(g, dtype=float)
-                        b_smooth = np.array(b, dtype=float)
-                    else:
-                        # EMA low-pass filter to prevent high-frequency jittering/flickering
-                        # alpha = 0.25 (25% new frame, 75% old frame)
-                        alpha = getattr(state, "temporal_smoothing", 0.25)
-                        r_smooth += (r - r_smooth) * alpha
-                        g_smooth += (g - g_smooth) * alpha
-                        b_smooth += (b - b_smooth) * alpha
+                    # EMA low-pass filter to prevent high-frequency jittering/flickering
+                    # alpha = 0.25 (25% new frame, 75% old frame)
+                    alpha = getattr(state, "temporal_smoothing", 0.25)
+                    r_smooth += (r_out - r_smooth) * alpha
+                    g_smooth += (g_out - g_smooth) * alpha
+                    b_smooth += (b_out - b_smooth) * alpha
 
                     # Apply global calibration multipliers
                     cr = getattr(state, "calib_r", 1.0)

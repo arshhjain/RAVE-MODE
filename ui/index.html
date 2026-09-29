@@ -1668,16 +1668,29 @@ function p3(r, g, b, a=1) {
   return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${a.toFixed(3)})`;
 }
 
-function drawFluid(pal, bass, treble) {
+let cachedBoosted = null;
+let lastBoostedPalStr = "";
+let lastSat = -1;
+
+function getBoosted(pal, sat) {
+    const palStr = JSON.stringify(pal);
+    if (lastBoostedPalStr === palStr && lastSat === sat) return cachedBoosted;
+    cachedBoosted = pal.map(([r,g,b]) => boostSaturation(r, g, b, sat));
+    lastBoostedPalStr = palStr;
+    lastSat = sat;
+    return cachedBoosted;
+}
+
+function drawFluid(pal, bass, treble, dt) {
   if (!pal || !pal.length) return;
   const W = fluidEl.width, H = fluidEl.height;
   fluidCtx.clearRect(0,0,W,H);
 
   const sat     = cache.knobs ? (cache.knobs.saturation ?? 1.4) : 1.4;
   const bgLevel = cache.knobs ? (cache.knobs.brightness ?? 0.15) : 0.15;
-  const boosted = pal.map(([r,g,b]) => boostSaturation(r, g, b, sat));
+  const boosted = getBoosted(pal, sat);
 
-  fluidTime += 0.005 + (bass * 0.02);
+  fluidTime += (0.125 + (bass * 0.5)) * dt;
 
   // Background ambient (pal[0])
   fluidCtx.fillStyle = p3(...boosted[0], Math.min(1.0, 0.45 + bgLevel * 1.2));
@@ -1970,6 +1983,7 @@ function onFrame(data){
     // Schedule canvas palette transition
     window.transitionPaletteParams = {
         startPalette: window.lastPalette || data.palette,
+        targetPalette: data.palette,
         startMorphTime: performance.now(),
         endMorphTime: performance.now() + 600
     };
@@ -1983,23 +1997,12 @@ function onFrame(data){
   }
   
   window.lastPalette = data.palette;
+  window.targetPalette = data.palette;
+  window.targetBass = data.bass;
+  window.targetTreble = data.treble;
 
-  let activePalette = data.palette;
-  if (window.transitionPaletteParams) {
-      const p = window.transitionPaletteParams;
-      const now = performance.now();
-      if (now < p.startMorphTime) {
-          activePalette = p.startPalette;
-      } else if (now < p.endMorphTime) {
-          const t = (now - p.startMorphTime) / (p.endMorphTime - p.startMorphTime);
-          activePalette = p.startPalette.map((color, i) => [
-              color[0] + (data.palette[i][0] - color[0]) * t,
-              color[1] + (data.palette[i][1] - color[1]) * t,
-              color[2] + (data.palette[i][2] - color[2]) * t
-          ]);
-      } else {
-          window.transitionPaletteParams = null;
-      }
+  if (window.transitionPaletteParams && window.transitionPaletteParams.targetPalette !== data.palette) {
+      window.transitionPaletteParams.targetPalette = data.palette;
   }
 
   mainW.forEach(w=>w.refresh(data.knobs));
@@ -2084,10 +2087,53 @@ function onFrame(data){
     if (segStat) segStat.textContent = data.segment_mode.charAt(0).toUpperCase() + data.segment_mode.slice(1);
   }
 
-  if (!document.body.classList.contains('power-off')) {
-      drawFluid(data.palette, data.bass, data.treble);
-  }
 }
+
+let currentBass = 0;
+let currentTreble = 0;
+window.currentPalette = [[30,30,60], [255,255,255], [0,150,255]];
+window.targetPalette = [[30,30,60], [255,255,255], [0,150,255]];
+window.targetBass = 0;
+window.targetTreble = 0;
+
+let lastAnimTime = performance.now();
+
+function animationLoop() {
+  const now = performance.now();
+  const dt = Math.min((now - lastAnimTime) / 1000, 0.1);
+  lastAnimTime = now;
+
+  const bDiff = window.targetBass - currentBass;
+  currentBass += bDiff * (1.0 - Math.exp(-(bDiff > 0 ? 35.0 : 15.0) * dt));
+
+  const tDiff = window.targetTreble - currentTreble;
+  currentTreble += tDiff * (1.0 - Math.exp(-(tDiff > 0 ? 40.0 : 18.0) * dt));
+  
+  if (window.transitionPaletteParams) {
+      const p = window.transitionPaletteParams;
+      if (now < p.startMorphTime) {
+          window.currentPalette = p.startPalette;
+      } else if (now < p.endMorphTime) {
+          const t = (now - p.startMorphTime) / (p.endMorphTime - p.startMorphTime);
+          window.currentPalette = p.startPalette.map((color, i) => [
+              color[0] + (p.targetPalette[i][0] - color[0]) * t,
+              color[1] + (p.targetPalette[i][1] - color[1]) * t,
+              color[2] + (p.targetPalette[i][2] - color[2]) * t
+          ]);
+      } else {
+          window.currentPalette = p.targetPalette;
+          window.transitionPaletteParams = null;
+      }
+  } else {
+      window.currentPalette = window.targetPalette;
+  }
+
+  if (!document.body.classList.contains('power-off')) {
+      drawFluid(window.currentPalette, currentBass, currentTreble, dt);
+  }
+  requestAnimationFrame(animationLoop);
+}
+requestAnimationFrame(animationLoop);
 
 const wizardSteps = [
     { name: "CYAN", color: [0,255,255], hex: "#00FFFF", left: "More Green", right: "More Blue", lc: "#44ff44", rc: "#4444ff" },
@@ -2290,15 +2336,17 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ── Resize ─────────────────────────────────────────────────────────────
+let resizeTimeout;
 function resize(){
-  if (typeof fluidEl !== 'undefined' && fluidEl) {
-    fluidEl.width  = fluidEl.offsetWidth;
-    fluidEl.height = fluidEl.offsetHeight;
-  }
-  setTimeout(() => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    if (typeof fluidEl !== 'undefined' && fluidEl) {
+      fluidEl.width  = fluidEl.offsetWidth;
+      fluidEl.height = fluidEl.offsetHeight;
+    }
     if (cache.title) applyMarquee('title-container', 'title-text', cache.title);
     if (cache.artist) applyMarquee('artist-container', 'artist-text', cache.artist);
-  }, 50);
+  }, 100);
 }
 window.onresize=resize;
 resize();
