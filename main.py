@@ -50,7 +50,12 @@ def check_for_updates():
             data = json.loads(response.read().decode())
             latest = data.get("tag_name", "").lstrip("v")
             if latest and latest != VERSION:
-                state.update_url = data.get("html_url")
+                exe_url = None
+                for asset in data.get("assets", []):
+                    if asset.get("name", "").endswith(".exe"):
+                        exe_url = asset.get("browser_download_url")
+                        break
+                state.update_url = exe_url or data.get("html_url")
     except Exception as e:
         print(f"[updater] Check failed: {e}")
 
@@ -59,6 +64,19 @@ def gaussian(x, mu, sig, amp):
     if sig == 0: return np.zeros_like(x)
     return amp * np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
 
+def _perform_update(url):
+    import urllib.request, subprocess, tempfile, os
+    try:
+        temp_exe = os.path.join(tempfile.gettempdir(), "RaveMode_Update.exe")
+        print(f"[updater] Downloading {url} to {temp_exe}")
+        req = urllib.request.Request(url, headers={'User-Agent': 'RaveMode-Updater'})
+        with urllib.request.urlopen(req) as response, open(temp_exe, 'wb') as out_file:
+            out_file.write(response.read())
+        print("[updater] Download complete. Launching installer...")
+        subprocess.Popen([temp_exe, "/SILENT", "/SP-", "/FORCECLOSEAPPLICATIONS"])
+        os._exit(0)
+    except Exception as e:
+        print(f"[updater] Update failed: {e}")
 
 def boost_saturation(rgb, factor):
     r, g, b = [x / 255.0 for x in rgb]
@@ -861,6 +879,10 @@ async def ws_endpoint(ws: WebSocket):
                         if mode in ("independent", "overlay", "continuous"):
                             state.segment_mode = mode
                             state.save_config()
+                    elif msg.get("type") == "trigger_update":
+                        url = msg.get("url")
+                        if url:
+                            threading.Thread(target=_perform_update, args=(url,), daemon=True).start()
                 except asyncio.TimeoutError:
                     has_messages = False
 

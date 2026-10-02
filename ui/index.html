@@ -2131,7 +2131,13 @@ function onFrame(data){
         window.updateDismissed = true;
         banner.remove();
       } else {
-        window.open(data.update_url, '_blank');
+        if (data.update_url.endsWith(".exe")) {
+          banner.innerHTML = "<b>⏳ Downloading Update...</b><br><span style='font-size:10px; opacity:0.7;'>Rave Mode will restart automatically shortly</span>";
+          banner.style.pointerEvents = "none";
+          wsSend({type: "trigger_update", url: data.update_url});
+        } else {
+          window.open(data.update_url, '_blank');
+        }
       }
     };
     document.body.appendChild(banner);
