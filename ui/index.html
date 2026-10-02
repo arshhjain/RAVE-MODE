@@ -2119,14 +2119,21 @@ function onFrame(data){
     if (segStat) segStat.textContent = data.segment_mode.charAt(0).toUpperCase() + data.segment_mode.slice(1);
   }
 
-  if (data.update_url && !document.getElementById('update-banner')) {
+  if (data.update_url && !document.getElementById('update-banner') && !window.updateDismissed) {
     const banner = document.createElement('div');
     banner.id = 'update-banner';
-    banner.style = "position:absolute; top:35px; left:50%; transform:translateX(-50%); background:rgba(0,150,255,0.15); border: 1px solid rgba(0,150,255,0.4); padding: 8px 16px; border-radius: 8px; color: #fff; font-size: 13px; z-index: 9999; cursor: pointer; text-align: center; backdrop-filter: blur(10px); box-shadow: 0 4px 15px rgba(0,150,255,0.2); transition: all 0.3s ease;";
-    banner.innerHTML = "<b>🚀 RAVE Mode Update Available!</b><br><span style='font-size:10px; opacity:0.7;'>Click to download the latest release</span>";
+    banner.style = "position:absolute; top:35px; left:50%; transform:translateX(-50%); background:rgba(0,150,255,0.15); border: 1px solid rgba(0,150,255,0.4); padding: 8px 32px 8px 16px; border-radius: 8px; color: #fff; font-size: 13px; z-index: 9999; cursor: pointer; text-align: center; backdrop-filter: blur(10px); box-shadow: 0 4px 15px rgba(0,150,255,0.2); transition: all 0.3s ease;";
+    banner.innerHTML = "<b>🚀 RAVE Mode Update Available!</b><br><span style='font-size:10px; opacity:0.7;'>Click to download the latest release</span><div id='update-close' style='position:absolute; top:50%; right:10px; transform:translateY(-50%); font-size:18px; line-height:1; opacity:0.6; padding:4px;'>&times;</div>";
     banner.onmouseover = () => banner.style.background = "rgba(0,150,255,0.25)";
     banner.onmouseout = () => banner.style.background = "rgba(0,150,255,0.15)";
-    banner.onclick = () => window.open(data.update_url, '_blank');
+    banner.onclick = (e) => {
+      if (e.target.id === 'update-close') {
+        window.updateDismissed = true;
+        banner.remove();
+      } else {
+        window.open(data.update_url, '_blank');
+      }
+    };
     document.body.appendChild(banner);
   }
 
