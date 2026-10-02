@@ -1044,16 +1044,26 @@ body.power-off .marquee-content {
   </div>
 
   <div id="vibe-section">
-    <div class="vibe-slider-wrap">
-      <div style="display:flex; justify-content:space-between; font-size:11px; color:rgba(255,255,255,0.4); margin-bottom:8px; padding: 0 4px;">
-        <span>Muted, Cohesive Colors</span>
-        <span>Wild, Contrasting Colors</span>
+    <div class="vibe-slider-wrap"
+         data-info="Color Extraction Strictness"
+         data-low="Muted, Cohesive Colors"
+         data-high="Wild, Contrasting Colors"
+         onmouseenter="showGlobalTip(this, {desc: this.getAttribute('data-info'), low: this.getAttribute('data-low'), high: this.getAttribute('data-high')})"
+         onmouseleave="hideGlobalTip()"
+         style="position:relative;">
+      
+      <div style="position:absolute; width:calc(100% - 16px); left:8px; top:24px; display:flex; justify-content:space-between; pointer-events:none;">
+        <div style="width:2px; height:6px; background:rgba(255,255,255,0.2);"></div>
+        <div style="width:2px; height:6px; background:rgba(255,255,255,0.2);"></div>
+        <div style="width:2px; height:6px; background:rgba(255,255,255,0.2);"></div>
+        <div style="width:2px; height:6px; background:rgba(255,255,255,0.2);"></div>
       </div>
+      
       <input type="range" id="vibe-slider" min="0" max="3" step="1" value="2">
       <div class="vibe-ticks">
         <span>Cozy</span>
-        <span>Lounge</span>
-        <span>Accurate</span>
+        <span style="visibility:hidden">Lounge</span>
+        <span style="visibility:hidden">Accurate</span>
         <span>Rave</span>
       </div>
     </div>
