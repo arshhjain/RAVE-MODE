@@ -1045,6 +1045,10 @@ body.power-off .marquee-content {
 
   <div id="vibe-section">
     <div class="vibe-slider-wrap">
+      <div style="display:flex; justify-content:space-between; font-size:11px; color:rgba(255,255,255,0.4); margin-bottom:8px; padding: 0 4px;">
+        <span>Muted, Cohesive Colors</span>
+        <span>Wild, Contrasting Colors</span>
+      </div>
       <input type="range" id="vibe-slider" min="0" max="3" step="1" value="2">
       <div class="vibe-ticks">
         <span>Cozy</span>
@@ -1188,6 +1192,16 @@ body.power-off .marquee-content {
               <span class="knob-label">Isolate RGB Software</span>
               <label class="power-switch" style="opacity:1; margin:0; width:34px; height:20px;">
                 <input type="checkbox" id="signalrgb-toggle" onchange="wsSend({type:'knob', key:'isolate_rgb', value:this.checked})">
+                <span class="power-slider"></span>
+              </label>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;">
+              <span class="knob-label" style="display:flex;flex-direction:column;">
+                Cohesive Color Extraction
+                <span style="font-size:11px;color:rgba(255,255,255,0.4);">Toggle off for Legacy algorithm</span>
+              </span>
+              <label class="power-switch" style="opacity:1; margin:0; width:34px; height:20px;">
+                <input type="checkbox" id="extraction-toggle" onchange="wsSend({type:'knob', key:'extraction_mode', value:this.checked ? 'cohesive' : 'legacy'})">
                 <span class="power-slider"></span>
               </label>
             </div>
@@ -1580,11 +1594,9 @@ function buildKnob(d, container){
 const mainW   = MAIN_K.map(k => buildKnob(k, document.getElementById('main-knobs')));
 
 // ── Vibe Slider & Power Toggle ──────────────────────────────────────
-const vibeVals = [0.08, 0.19, 0.68, 1.0];
 document.getElementById('vibe-slider').addEventListener('input', e => {
   const rounded = Math.round(parseFloat(e.target.value));
-  const v = vibeVals[rounded];
-  wsSend({type:'knob', key:'saturation', value:v});
+  wsSend({type:'knob', key:'extraction_cone', value:rounded});
 });
 document.getElementById('power-toggle').addEventListener('change', e => {
   wsSend({type:'knob', key:'power', value:e.target.checked});
@@ -2031,14 +2043,12 @@ function onFrame(data){
       if (sigEl) {
           sigEl.checked = data.knobs.isolate_rgb !== false;
       }
-      const sat = data.knobs.saturation;
+      const extEl = document.getElementById('extraction-toggle');
+      if (extEl) {
+          extEl.checked = data.knobs.extraction_mode === "cohesive";
+      }
       if (document.activeElement !== document.getElementById('vibe-slider')) {
-        let val = 2; // Accurate default
-        if (sat < 0.135) val = 0;
-        else if (sat < 0.435) val = 1;
-        else if (sat < 0.84) val = 2;
-        else val = 3;
-        document.getElementById('vibe-slider').value = val;
+        document.getElementById('vibe-slider').value = (data.knobs.extraction_cone !== undefined) ? data.knobs.extraction_cone : 2;
       }
   }
   let visKnobs = data.knobs ? Object.assign({}, data.knobs) : null;
@@ -2085,6 +2095,17 @@ function onFrame(data){
   if (data.segment_mode) {
     const segStat = document.getElementById('acc-seg-stat');
     if (segStat) segStat.textContent = data.segment_mode.charAt(0).toUpperCase() + data.segment_mode.slice(1);
+  }
+
+  if (data.update_url && !document.getElementById('update-banner')) {
+    const banner = document.createElement('div');
+    banner.id = 'update-banner';
+    banner.style = "position:absolute; top:35px; left:50%; transform:translateX(-50%); background:rgba(0,150,255,0.15); border: 1px solid rgba(0,150,255,0.4); padding: 8px 16px; border-radius: 8px; color: #fff; font-size: 13px; z-index: 9999; cursor: pointer; text-align: center; backdrop-filter: blur(10px); box-shadow: 0 4px 15px rgba(0,150,255,0.2); transition: all 0.3s ease;";
+    banner.innerHTML = "<b>🚀 RAVE Mode Update Available!</b><br><span style='font-size:10px; opacity:0.7;'>Click to download the latest release</span>";
+    banner.onmouseover = () => banner.style.background = "rgba(0,150,255,0.25)";
+    banner.onmouseout = () => banner.style.background = "rgba(0,150,255,0.15)";
+    banner.onclick = () => window.open(data.update_url, '_blank');
+    document.body.appendChild(banner);
   }
 
 }

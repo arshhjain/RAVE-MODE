@@ -1,6 +1,6 @@
 [Setup]
 AppName=Rave Mode
-AppVersion=2.1
+AppVersion=2.2.0
 DefaultDirName={autopf}\RaveMode
 DefaultGroupName=Rave Mode
 OutputDir=dist

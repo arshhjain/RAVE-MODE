@@ -1,10 +1,16 @@
-import json, os, threading
+import json, os, sys, threading
 
 DEFAULT_IP    = '172.20.10.9'
 DEFAULT_PORT  = 21324
 DEFAULT_COUNT = 197
 
-APP_PATH    = os.path.dirname(os.path.abspath(__file__))
+# Store config in AppData so it persists between installs and has write permissions
+APP_NAME = "RaveMode"
+if sys.platform == 'win32':
+    APP_PATH = os.path.join(os.environ.get('APPDATA', ''), APP_NAME)
+else:
+    APP_PATH = os.path.expanduser(f"~/.{APP_NAME.lower()}")
+os.makedirs(APP_PATH, exist_ok=True)
 CONFIG_FILE = os.path.join(APP_PATH, "vibesync_config.json")
 
 class VisualizerState:
@@ -42,6 +48,8 @@ class VisualizerState:
         self.treble_intensity = 0.835
         self.attack_gamma     = 1.38
         self.decay_gamma      = 0.8
+        self.extraction_mode  = "cohesive"
+        self.extraction_cone  = 2  # 0=Cozy, 1=Lounge, 2=Accurate, 3=Rave
 
         # Segments & Layout
         self.segments     = []
@@ -53,6 +61,7 @@ class VisualizerState:
         self.current_palette = [[20, 20, 20]] * 3
         self.target_palette  = [[20, 20, 20]] * 3
         self.album_art_b64   = None   # base64 JPEG for frontend background
+        self.cached_candidates = []   # cached dominant color list
         self.new_art_flag    = False
         self.new_track_flag  = False
 
@@ -90,6 +99,7 @@ class VisualizerState:
             "art":          self.album_art_b64,
             "segments":     self.segments,
             "segment_mode": self.segment_mode,
+            "update_url":   getattr(self, "update_url", None),
             "knobs": {
                 "power":            self.power,
                 "sensitivity":      self.sensitivity,
@@ -107,6 +117,8 @@ class VisualizerState:
                 "treble_intensity": self.treble_intensity,
                 "attack_gamma":     self.attack_gamma,
                 "decay_gamma":      self.decay_gamma,
+                "extraction_mode":  getattr(self, "extraction_mode", "cohesive"),
+                "extraction_cone":  getattr(self, "extraction_cone", 2),
                 "led_count":        self.led_count,
                 "wled_ip":          self.wled_ip,
                 "wled_port":        self.wled_port,
@@ -174,7 +186,7 @@ class VisualizerState:
 
     # ------------------------------------------------------------------
     def save_config(self):
-        exclude = {"running", "album_art_b64", "current_title", "current_artist", "live_bass", "live_treble", "new_art_flag", "new_track_flag"}
+        exclude = {"running", "album_art_b64", "cached_candidates", "current_title", "current_artist", "live_bass", "live_treble", "new_art_flag", "new_track_flag"}
         data = {k: v for k, v in self.__dict__.items()
                 if k not in exclude and type(v) in (float, int, str, list)}
         try:

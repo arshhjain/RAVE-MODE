@@ -1,5 +1,5 @@
 import asyncio, base64, colorsys, io, json, math, os, socket, time
-import sys, threading, warnings, queue
+import sys, threading, warnings, queue, urllib.request
 from collections import deque
 
 import numpy as np
@@ -39,6 +39,20 @@ SEND_HZ = 50  # network frame rate — decoupled from audio chunk rate
 # Saturation multiplier applied to extracted album-art colors
 EXTRACTION_SATURATION_BOOST = 1.0
 
+VERSION = "2.2.0"
+GITHUB_REPO = "arshhjain/RAVE-MODE"
+
+def check_for_updates():
+    try:
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+        req = urllib.request.Request(url, headers={'User-Agent': 'RaveMode-Updater'})
+        with urllib.request.urlopen(req, timeout=5.0) as response:
+            data = json.loads(response.read().decode())
+            latest = data.get("tag_name", "").lstrip("v")
+            if latest and latest != VERSION:
+                state.update_url = data.get("html_url")
+    except Exception as e:
+        print(f"[updater] Check failed: {e}")
 
 # ── helpers ────────────────────────────────────────────────────────────
 def gaussian(x, mu, sig, amp):
@@ -58,10 +72,8 @@ def boost_saturation(rgb, factor):
     return [int(r * 255), int(g * 255), int(b * 255)]
 
 
-def get_top_3_colors(image):
-    """Fast dominant-color extraction with distinct-hue enforcement,
-    fallback accents for monochromatic covers, and background clamping.
-    Returns palette in explicit role order: [Background, Bass, Treble]."""
+def extract_color_candidates(image):
+    """Heavy operation: quantizes image to extract dominant colors."""
     try:
         small = image.resize((48, 48), resample=Image.Resampling.NEAREST)
         paletted = small.quantize(colors=12, method=Image.Quantize.FASTOCTREE)
@@ -69,23 +81,81 @@ def get_top_3_colors(image):
         palette = paletted.getpalette()
 
         if not dominant or not palette:
-            return [[30, 30, 60], [255, 255, 255], [0, 150, 255]]
+            return []
 
         candidates = []
         for count, index in dominant:
             r, g, b = palette[index * 3: index * 3 + 3]
             h, s, v = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
-
-            if v < 0.10:
-                continue
-
-            # Weight prevalence much higher to respect muted but dominant colors,
-            # rather than aggressively hunting for tiny saturated pixels.
+            if v < 0.10: continue
             score = s * 0.6 + v * 0.3 + (count / 2304) * 2.5
             candidates.append(((r, g, b), (h, s, v), score))
 
         candidates.sort(key=lambda x: x[2], reverse=True)
+        return candidates
+    except Exception as e:
+        print(f"[color_extract] error: {e}")
+        return []
 
+def _clean_subpixels(rgb_color, threshold_ratio=0.06):
+    """
+    Zeroes out any subpixel that contributes less than a specific ratio to the max subpixel.
+    This entirely prevents 0-to-1 threshold flicker on fading RGB LEDs.
+    """
+    max_val = max(rgb_color)
+    if max_val == 0:
+        return [0, 0, 0]
+    return [c if (c / max_val) > threshold_ratio else 0 for c in rgb_color]
+
+def resolve_palette(candidates, mode="cohesive", cone_level=2):
+    """Lightweight mathematical resolution of a palette from a cached candidate list."""
+    if not candidates:
+        return [[30, 30, 60], [255, 255, 255], [0, 150, 255]]
+
+    if mode == "cohesive":
+        # Map cone_level to a cone width (max hue distance)
+        if cone_level == 0: max_h_dist = 0.15      # Cozy
+        elif cone_level == 1: max_h_dist = 0.25    # Lounge
+        elif cone_level == 2: max_h_dist = 0.35    # Accurate
+        else: max_h_dist = 0.50                    # Rave
+
+        bass_rgb, bass_hsv, _ = candidates[0]
+        
+        treble_hsv = None
+        for rgb, hsv, _ in candidates[1:]:
+            h_dist = min(abs(bass_hsv[0] - hsv[0]), 1.0 - abs(bass_hsv[0] - hsv[0]))
+            if 0.08 <= h_dist <= max_h_dist:
+                treble_hsv = hsv
+                break
+        
+        if not treble_hsv:
+            new_h = (bass_hsv[0] + (max_h_dist / 2.0)) % 1.0
+            treble_hsv = (new_h, bass_hsv[1], bass_hsv[2])
+        
+        bass_v = bass_hsv[2]
+        bass_s = max(0.4, bass_hsv[1])
+        
+        tr, tg, tb = colorsys.hsv_to_rgb(treble_hsv[0], bass_s, bass_v)
+        treble_rgb = (int(tr*255), int(tg*255), int(tb*255))
+        
+        br, bg, bb = colorsys.hsv_to_rgb(bass_hsv[0], bass_s, bass_v)
+        bass_rgb = (int(br*255), int(bg*255), int(bb*255))
+        
+        mid_h = (bass_hsv[0] + treble_hsv[0]) / 2.0
+        if abs(bass_hsv[0] - treble_hsv[0]) > 0.5:
+            mid_h = (mid_h + 0.5) % 1.0
+            
+        # Boost background brightness so cohesive mode doesn't feel too dim
+        bg_r, bg_g, bg_b = colorsys.hsv_to_rgb(mid_h, 0.35, 0.40)
+        bg_rgb = (int(bg_r*255), int(bg_g*255), int(bg_b*255))
+        # Clean subpixels to prevent 0-1 flicker on fade-outs
+        bass_rgb = _clean_subpixels(bass_rgb)
+        treble_rgb = _clean_subpixels(treble_rgb)
+        
+        return [list(bg_rgb), list(bass_rgb), list(treble_rgb)]
+
+    else:
+        # Legacy Mode
         selected_rgb = []
         selected_hsv = []
 
@@ -102,26 +172,22 @@ def get_top_3_colors(image):
             if len(selected_rgb) == 3:
                 break
 
-        # Generate harmonious accents if cover is monochromatic
         if len(selected_rgb) == 1:
             selected_rgb.append(_generate_fallback_accent(selected_hsv[0], hue_shift=0.33))
             selected_rgb.append(_generate_fallback_accent(selected_hsv[0], hue_shift=0.66))
         elif len(selected_rgb) == 2:
             selected_rgb.append(_generate_fallback_accent(selected_hsv[0], hue_shift=0.50))
 
-        # Primary (Bass pulse) and Accent (Treble pulse)
-        col_primary = boost_saturation(selected_rgb[0], EXTRACTION_SATURATION_BOOST)
-        col_accent = boost_saturation(selected_rgb[2], EXTRACTION_SATURATION_BOOST)
-
-        # Soft-clamp secondary (WLED background base) to tame contrast
+        col_primary = _clean_subpixels(boost_saturation(selected_rgb[0], EXTRACTION_SATURATION_BOOST))
+        col_accent = _clean_subpixels(boost_saturation(selected_rgb[2], EXTRACTION_SATURATION_BOOST))
         col_background = _clamp_background_brightness(selected_rgb[1])
 
-        # Return explicit role order: [Background, Bass, Treble]
         return [list(col_background), list(col_primary), list(col_accent)]
 
-    except Exception as e:
-        print(f"[color_extract] error: {e}")
-        return [[30, 30, 60], [255, 255, 255], [0, 150, 255]]
+def get_top_3_colors(image, mode="cohesive", cone_level=2):
+    """Wrapper function for backward compatibility."""
+    candidates = extract_color_candidates(image)
+    return resolve_palette(candidates, mode, cone_level)
 
 
 def _clamp_background_brightness(rgb, min_v=0.18, max_v=0.42, target_s=0.15):
@@ -367,7 +433,7 @@ class AutoGain:
         self.current = 0.85
         self.track_change_time = time.monotonic()
 
-    def update(self, vol):
+    def update(self, vol, mode="legacy"):
         self.history.append(vol)
         if not self.history:
             return 1.0
@@ -380,6 +446,10 @@ class AutoGain:
             target_gain = 1.0
         else:
             target_gain = max(0.20, min(3.5, 0.12 / (peak + 0.001)))
+            
+        # Overcompensate AGC volume for Cohesive mode because colors are lower contrast
+        if mode == "cohesive":
+            target_gain = min(5.0, target_gain * 1.6)
 
         # Fast attack when loud volume surge occurs (prevent redlining instantly),
         # slow release when music drops (prevent gain pumping)
@@ -522,7 +592,7 @@ def audio_listener(client: WLEDClient):
                         state.new_track_flag = False
                         agc.on_track_change()
 
-                    gain = agc.update(raw_b * 1.2 + raw_t)
+                    gain = agc.update(raw_b * 1.2 + raw_t, getattr(state, "extraction_mode", "cohesive"))
                     bat, bde, tat, tde = state.get_attack_decay()
                     att_g = getattr(state, "attack_gamma", 1.3)
                     dec_g = getattr(state, "decay_gamma", 1.2)
@@ -543,7 +613,10 @@ def audio_listener(client: WLEDClient):
                         par_b = arc_peak_b / (arc_avg_b + 1e-4)
                         target_mult_b = 1.0
                         if par_b < 1.4:
-                            target_mult_b = 1.0 + (1.4 - par_b) * 6.0
+                            boost = (1.4 - par_b) * 6.0
+                            if getattr(state, "extraction_mode", "cohesive") == "cohesive":
+                                boost *= 2.0
+                            target_mult_b = 1.0 + boost
                         arc_mult_b = arc_mult_b * 0.95 + target_mult_b * 0.05
                         
                         # Treble ARC
@@ -556,7 +629,10 @@ def audio_listener(client: WLEDClient):
                         par_t = arc_peak_t / (arc_avg_t + 1e-4)
                         target_mult_t = 1.0
                         if par_t < 1.4:
-                            target_mult_t = 1.0 + (1.4 - par_t) * 6.0
+                            boost = (1.4 - par_t) * 6.0
+                            if getattr(state, "extraction_mode", "cohesive") == "cohesive":
+                                boost *= 2.0
+                            target_mult_t = 1.0 + boost
                         arc_mult_t = arc_mult_t * 0.95 + target_mult_t * 0.05
                     else:
                         arc_mult_b = 1.0
@@ -567,22 +643,28 @@ def audio_listener(client: WLEDClient):
                     # Non-linear ease-in attack and smooth accelerated fade rates:
                     # - Ease-in attack eliminates the 1st-frame maximum-velocity strobe jerk from darkness
                     # - Settling fade cleans up the asymptotic low-end tail so LEDs don't linger on 1-LSB flicker
+                    # Dynamic Noise-Gate Smoother
+                    # Scales attack and decay rates based on amplitude. 
+                    # Huge peaks = normal fast response. Weak peaks = heavily slowed down to absorb flicker/noise.
+                    noise_gate_b = min(1.0, max(0.15, raw_b * 6.0))
+                    noise_gate_t = min(1.0, max(0.15, raw_t * 6.0))
+
                     if raw_b > bv:
-                        b_rate = bat * (0.35 + 0.65 * min(1.0, bv / (raw_b + 1e-4)))
+                        b_rate = bat * (0.35 + 0.65 * min(1.0, bv / (raw_b + 1e-4))) * noise_gate_b
                         bv = bv + (raw_b - bv) * b_rate
                     else:
                         dec_mod = min(1.0, (bv + 1e-4) ** (dec_g - 1.0))
-                        b_rate = (1.0 - bde) * (0.65 + 0.35 * dec_mod)
+                        b_rate = (1.0 - bde) * (0.65 + 0.35 * dec_mod) * noise_gate_b
                         if getattr(state, "arc_enabled", True):
                             b_rate = min(1.0, b_rate * arc_mult_b)
                         bv = max(0.0, bv - (bv - raw_b) * b_rate)
 
                     if raw_t > tv:
-                        t_rate = tat * (0.30 + 0.70 * min(1.0, tv / (raw_t + 1e-4)))
+                        t_rate = tat * (0.30 + 0.70 * min(1.0, tv / (raw_t + 1e-4))) * noise_gate_t
                         tv = tv + (raw_t - tv) * t_rate
                     else:
                         dec_mod = min(1.0, (tv + 1e-4) ** (dec_g - 1.0))
-                        t_rate = (1.0 - tde) * (0.70 + 0.30 * dec_mod)
+                        t_rate = (1.0 - tde) * (0.70 + 0.30 * dec_mod) * noise_gate_t
                         if getattr(state, "arc_enabled", True):
                             t_rate = min(1.0, t_rate * arc_mult_t)
                         tv = max(0.0, tv - (tv - raw_t) * t_rate)
@@ -694,7 +776,8 @@ async def media_loop():
                         await reader.load_async(stream.size)
                         reader.read_bytes(b)
                         img = Image.open(io.BytesIO(b)).convert("RGB")
-                        state.target_palette = get_top_3_colors(img)
+                        state.cached_candidates = extract_color_candidates(img)
+                        state.target_palette = resolve_palette(state.cached_candidates, getattr(state, 'extraction_mode', 'cohesive'), getattr(state, 'extraction_cone', 2))
                         # 1. Fast synchronous low-res frame to trigger UI flip immediately
                         bg_low = img.resize((256, 256))
                         state.album_art_b64 = image_to_b64(bg_low, quality=60)
@@ -742,6 +825,11 @@ async def ws_endpoint(ws: WebSocket):
                     msg = json.loads(raw)
                     if msg.get("type") == "knob":
                         state.apply_knob(msg["key"], msg["value"])
+                        if msg["key"] in ("extraction_mode", "extraction_cone") and getattr(state, "cached_candidates", None):
+                            try:
+                                state.target_palette = resolve_palette(state.cached_candidates, getattr(state, 'extraction_mode', 'cohesive'), getattr(state, 'extraction_cone', 2))
+                            except Exception as e:
+                                print(f"[ui] Error resolving palette on toggle: {e}")
                     elif msg.get("type") == "window":
                         _handle_window(msg)
                     elif msg.get("type") == "reset_defaults":
@@ -862,6 +950,7 @@ def main():
     client = WLEDClient()
     threading.Thread(target=audio_listener, args=(client,), daemon=True).start()
     threading.Thread(target=lambda: asyncio.run(media_loop()), daemon=True).start()
+    threading.Thread(target=check_for_updates, daemon=True).start()
 
     threading.Thread(target=start_server, daemon=True).start()
     _server_ready.wait(timeout=10)
