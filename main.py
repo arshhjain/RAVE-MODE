@@ -132,7 +132,7 @@ def resolve_palette(candidates, mode="cohesive", cone_level=2):
             new_h = (bass_hsv[0] + (max_h_dist / 2.0)) % 1.0
             treble_hsv = (new_h, bass_hsv[1], bass_hsv[2])
         
-        bass_v = bass_hsv[2]
+        bass_v = 1.0  # Maximize luminance for explosive audio reactions
         bass_s = max(0.4, bass_hsv[1])
         
         tr, tg, tb = colorsys.hsv_to_rgb(treble_hsv[0], bass_s, bass_v)
