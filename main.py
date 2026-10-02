@@ -467,8 +467,7 @@ class AutoGain:
             
         # Overcompensate AGC volume for Cohesive mode because colors are lower contrast
         if mode == "cohesive":
-            target_gain = min(5.0, target_gain * 1.6)
-
+            target_gain = min(5.0, target_gain * 1.2)
         # Fast attack when loud volume surge occurs (prevent redlining instantly),
         # slow release when music drops (prevent gain pumping)
         rate = 0.12 if target_gain < self.current else 0.015
@@ -610,15 +609,7 @@ def audio_listener(client: WLEDClient):
                         state.new_track_flag = False
                         agc.on_track_change()
 
-                    contrast_mult = 1.0
-                    if getattr(state, "dynamic_contrast", True):
-                        pal = state.current_palette
-                        h1 = colorsys.rgb_to_hsv(pal[0][0]/255.0, pal[0][1]/255.0, pal[0][2]/255.0)[0]
-                        h2 = colorsys.rgb_to_hsv(pal[2][0]/255.0, pal[2][1]/255.0, pal[2][2]/255.0)[0]
-                        hue_dist = min(abs(h1 - h2), 1.0 - abs(h1 - h2)) * 2.0 # 0.0 to 1.0
-                        contrast_mult = 1.0 + 1.5 * (1.0 - hue_dist)
-
-                    gain = agc.update(raw_b * 1.2 + raw_t, getattr(state, "extraction_mode", "cohesive")) * contrast_mult
+                    gain = agc.update(raw_b * 1.2 + raw_t, getattr(state, "extraction_mode", "cohesive"))
                     bat, bde, tat, tde = state.get_attack_decay()
                     att_g = getattr(state, "attack_gamma", 1.3)
                     dec_g = getattr(state, "decay_gamma", 1.2)
@@ -642,7 +633,7 @@ def audio_listener(client: WLEDClient):
                             boost = (1.4 - par_b) * 6.0
                             if getattr(state, "extraction_mode", "cohesive") == "cohesive":
                                 boost *= 2.0
-                            target_mult_b = 1.0 + boost * contrast_mult
+                            target_mult_b = 1.0 + boost
                         arc_mult_b = arc_mult_b * 0.95 + target_mult_b * 0.05
                         
                         # Treble ARC
@@ -658,7 +649,7 @@ def audio_listener(client: WLEDClient):
                             boost = (1.4 - par_t) * 6.0
                             if getattr(state, "extraction_mode", "cohesive") == "cohesive":
                                 boost *= 2.0
-                            target_mult_t = 1.0 + boost * contrast_mult
+                            target_mult_t = 1.0 + boost
                         arc_mult_t = arc_mult_t * 0.95 + target_mult_t * 0.05
                     else:
                         arc_mult_b = 1.0
