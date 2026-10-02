@@ -1060,11 +1060,9 @@ body.power-off .marquee-content {
       </div>
       
       <input type="range" id="vibe-slider" min="0" max="3" step="1" value="2">
-      <div class="vibe-ticks">
-        <span>Cozy</span>
-        <span style="visibility:hidden">Lounge</span>
-        <span style="visibility:hidden">Accurate</span>
-        <span>Rave</span>
+      <div style="position:relative; width:100%; height:15px; pointer-events:none;">
+        <span style="position:absolute; left:8px; transform:translateX(-50%); font-size:9px; font-weight:700; color:var(--text-mid); letter-spacing:0.1em; text-transform:uppercase;">Cozy</span>
+        <span style="position:absolute; right:8px; transform:translateX(50%); font-size:9px; font-weight:700; color:var(--text-mid); letter-spacing:0.1em; text-transform:uppercase;">Rave</span>
       </div>
     </div>
   </div>
@@ -1212,6 +1210,16 @@ body.power-off .marquee-content {
               </span>
               <label class="power-switch" style="opacity:1; margin:0; width:34px; height:20px;">
                 <input type="checkbox" id="extraction-toggle" onchange="wsSend({type:'knob', key:'extraction_mode', value:this.checked ? 'cohesive' : 'legacy'})">
+                <span class="power-slider"></span>
+              </label>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:15px;">
+              <span class="knob-label" style="display:flex;flex-direction:column;">
+                Dynamic Contrast Compensation
+                <span style="font-size:11px;color:rgba(255,255,255,0.4);">Scale audio reactivity by palette contrast</span>
+              </span>
+              <label class="power-switch" style="opacity:1; margin:0; width:34px; height:20px;">
+                <input type="checkbox" id="contrast-toggle" onchange="wsSend({type:'knob', key:'dynamic_contrast', value:this.checked})">
                 <span class="power-slider"></span>
               </label>
             </div>
@@ -2056,6 +2064,10 @@ function onFrame(data){
       const extEl = document.getElementById('extraction-toggle');
       if (extEl) {
           extEl.checked = data.knobs.extraction_mode === "cohesive";
+      }
+      const conEl = document.getElementById('contrast-toggle');
+      if (conEl) {
+          conEl.checked = data.knobs.dynamic_contrast !== false;
       }
       if (document.activeElement !== document.getElementById('vibe-slider')) {
         document.getElementById('vibe-slider').value = (data.knobs.extraction_cone !== undefined) ? data.knobs.extraction_cone : 2;

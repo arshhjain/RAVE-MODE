@@ -50,6 +50,7 @@ class VisualizerState:
         self.decay_gamma      = 0.8
         self.extraction_mode  = "cohesive"
         self.extraction_cone  = 2  # 0=Cozy, 1=Lounge, 2=Accurate, 3=Rave
+        self.dynamic_contrast = True
 
         # Segments & Layout
         self.segments     = []
@@ -118,6 +119,7 @@ class VisualizerState:
                 "attack_gamma":     self.attack_gamma,
                 "decay_gamma":      self.decay_gamma,
                 "extraction_mode":  getattr(self, "extraction_mode", "cohesive"),
+                "dynamic_contrast": getattr(self, "dynamic_contrast", True),
                 "extraction_cone":  getattr(self, "extraction_cone", 2),
                 "led_count":        self.led_count,
                 "wled_ip":          self.wled_ip,
